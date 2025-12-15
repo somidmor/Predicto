@@ -22,7 +22,7 @@ import { INITIAL_BALANCE } from '../types';
 export function JoinPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { t, isRTL, formatNumber } = useLanguage();
+  const { isRTL, formatNumber } = useLanguage();
   const { lastProfile, setCurrentSessionId } = useAuth();
   const { setSessionId: setContextSessionId } = useSession();
 
@@ -58,7 +58,7 @@ export function JoinPage() {
         const session = await getSession(sessionId);
         if (!session) {
           setSessionExists(false);
-          setError(t('Session not found'));
+          setError('Session not found');
           setIsChecking(false);
           return;
         }
@@ -88,14 +88,14 @@ export function JoinPage() {
       } catch (err) {
         console.error('Error checking session:', err);
         setSessionExists(false);
-        setError(t('Session not found'));
+        setError('Session not found');
       } finally {
         setIsChecking(false);
       }
     }
 
     checkSession();
-  }, [sessionId, navigate, t]);
+  }, [sessionId, navigate]);
 
   // Handle returning player rejoining
   const handleReturningPlayerJoin = () => {
@@ -171,7 +171,7 @@ export function JoinPage() {
           >
             <div className="text-6xl mb-4">😕</div>
             <h1 className="text-2xl font-display font-bold mb-2">
-              {t('Session not found')}
+              Session Not Found
             </h1>
             <p className="text-surface-400 mb-6">
               The session code "{sessionId}" doesn't exist or has ended.
@@ -182,7 +182,7 @@ export function JoinPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {t('Back')}
+              Go Back
             </motion.button>
           </motion.div>
         </div>
@@ -212,7 +212,7 @@ export function JoinPage() {
               </motion.div>
               
               <h1 className="text-3xl font-display font-bold mb-2">
-                {t('Welcome back!')}
+                Welcome Back!
               </h1>
               
               <p className="text-surface-400">
@@ -227,13 +227,13 @@ export function JoinPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <p className="text-surface-400 text-sm mb-1">{t('Your Balance')}</p>
+              <p className="text-surface-400 text-sm mb-1">Your Balance</p>
               <div className="flex items-center justify-center gap-2">
                 <Sparkles className="w-6 h-6 text-accent-400" />
                 <span className="text-4xl font-display font-bold text-accent-400">
                   {formatNumber(returningPlayer.balance)}
                 </span>
-                <span className="text-surface-500">{t('Anars')}</span>
+                <span className="text-surface-500">Anars</span>
               </div>
             </motion.div>
 
@@ -249,7 +249,7 @@ export function JoinPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <span>{t('Join')}</span>
+              <span>Continue Playing</span>
               <ArrowRight className={`w-5 h-5 ${isRTL ? 'rotate-180' : ''}`} />
             </motion.button>
           </motion.div>
@@ -273,7 +273,7 @@ export function JoinPage() {
               {sessionId}
             </div>
             <h1 className="text-3xl font-display font-bold mb-2">
-              {t('Join Game')}
+              Join the Game
             </h1>
 
             {/* Starter Balance Banner */}
@@ -285,7 +285,7 @@ export function JoinPage() {
             >
               <Gift className="w-5 h-5" />
               <span className="font-medium">
-                Get {formatNumber(INITIAL_BALANCE)} {t('Anars')} to start!
+                Get {formatNumber(INITIAL_BALANCE)} Anars to start!
               </span>
             </motion.div>
           </div>
@@ -295,7 +295,7 @@ export function JoinPage() {
             {/* First Name */}
             <div>
               <label className="block text-sm font-medium text-surface-300 mb-2">
-                {t('First Name')}
+                First Name
               </label>
               <div className="relative">
                 <User
@@ -317,7 +317,7 @@ export function JoinPage() {
             {/* Last Name */}
             <div>
               <label className="block text-sm font-medium text-surface-300 mb-2">
-                {t('Last Name')}
+                Last Name
               </label>
               <div className="relative">
                 <User
@@ -339,7 +339,7 @@ export function JoinPage() {
             {/* Age */}
             <div>
               <label className="block text-sm font-medium text-surface-300 mb-2">
-                {t('Age')}
+                Age
               </label>
               <div className="relative">
                 <Calendar
@@ -383,7 +383,7 @@ export function JoinPage() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  <span>{t('Join Game')}</span>
+                  <span>Join Game</span>
                   <ArrowRight className={`w-5 h-5 ${isRTL ? 'rotate-180' : ''}`} />
                 </>
               )}

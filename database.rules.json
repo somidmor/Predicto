@@ -2,10 +2,7 @@
   "rules": {
     "sessions": {
       "$sessionId": {
-        // Allow reads for real-time game state
         ".read": true,
-        
-        // Writes only via Cloud Functions (admin SDK)
         ".write": false,
         
         "status": {
@@ -33,6 +30,21 @@
           ".write": false
         },
         
+        "participants": {
+          ".read": true,
+          ".write": false,
+          
+          "$participantId": {
+            ".read": true,
+            ".write": false
+          }
+        },
+        
+        "participantCount": {
+          ".read": true,
+          ".write": false
+        },
+        
         "bets": {
           ".read": true,
           ".write": false,
@@ -56,11 +68,30 @@
         "winnerId": {
           ".read": true,
           ".write": false
+        },
+        
+        "challengeId": {
+          ".read": true,
+          ".write": false
+        },
+        
+        "challengeName": {
+          ".read": true,
+          ".write": false
+        },
+        
+        "requiredParticipants": {
+          ".read": true,
+          ".write": false
+        },
+        
+        "bettingLocked": {
+          ".read": true,
+          ".write": false
         }
       }
     },
     
-    // Deny all other access
     ".read": false,
     ".write": false
   }

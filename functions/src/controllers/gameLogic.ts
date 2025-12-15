@@ -13,7 +13,6 @@ import {
   GameState,
   Challenge,
   VOLUNTEER_MULTIPLIER,
-  DEFAULT_BETTING_DURATION,
 } from '../types/schema';
 
 // ============================================
@@ -320,32 +319,22 @@ export const selectContestants = onCall<SelectContestantsData>(
 
 interface StartBettingPhaseData {
   sessionId: string;
-  duration?: number;
 }
 
 export const startBettingPhase = onCall<StartBettingPhaseData>(
   async (request): Promise<{ success: boolean }> => {
-    const { sessionId, duration } = request.data;
+    const { sessionId } = request.data;
 
     await validateSession(sessionId);
-
-    const bettingDuration = duration || DEFAULT_BETTING_DURATION;
-    const now = Date.now();
-    const endAt = now + bettingDuration * 1000;
 
     // Update Firestore
     await db.collection('sessions').doc(sessionId).update({
       status: 'BETTING',
     });
 
-    // Update RTDB
+    // Update RTDB - no timer, host controls everything
     await rtdb.ref(`sessions/${sessionId}`).update({
       status: 'BETTING',
-      timer: {
-        startedAt: now,
-        endAt,
-        duration: bettingDuration,
-      },
       bettingLocked: false,
     });
 
@@ -458,7 +447,6 @@ export const closeBetting = onCall<CloseBettingData>(
     await rtdb.ref(`sessions/${sessionId}`).update({
       status: 'IN_PROGRESS',
       bettingLocked: true,
-      timer: null,
     });
 
     await db.collection('sessions').doc(sessionId).update({
@@ -647,7 +635,6 @@ export const resetSession = onCall<ResetSessionData>(
       status: 'OPEN',
       challengeId: null,
       challengeName: null,
-      timer: null,
       volunteers: {},
       contestants: [],
       bets: {},

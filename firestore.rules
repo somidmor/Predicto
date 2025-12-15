@@ -10,14 +10,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Users collection
-    // Read: Anyone with the userId can read their own profile
-    // Write: Only via Cloud Functions (server-side)
+    // Users collection (legacy - kept for backwards compatibility)
     match /users/{userId} {
-      // Allow reads - users need to see their own balance
       allow read: if true;
-      
-      // Writes must come from Cloud Functions (admin SDK bypasses rules)
       allow write: if false;
     }
     
@@ -29,6 +24,12 @@ service cloud.firestore {
       // Writes only via Cloud Functions
       allow write: if false;
       
+      // Participants subcollection (session-scoped users)
+      match /participants/{participantDocId} {
+        allow read: if true;
+        allow write: if false;
+      }
+      
       // Challenges subcollection
       match /challenges/{challengeId} {
         allow read: if true;
@@ -37,7 +38,6 @@ service cloud.firestore {
       
       // Bets subcollection (audit trail)
       match /bets/{betId} {
-        // Users can read their own bets
         allow read: if true;
         allow write: if false;
       }

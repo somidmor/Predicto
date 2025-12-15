@@ -14,7 +14,6 @@ import {
 import type { ReactNode } from 'react';
 import {
   getUserId,
-  getSessionUserIdentity,
   isSessionAdmin,
   getAdminIdentity,
   getLastProfile,

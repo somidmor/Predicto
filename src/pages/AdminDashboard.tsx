@@ -1,15 +1,18 @@
 // ============================================
 // PREDICTO - Admin Dashboard
 // Host control panel for managing sessions
+// Real-time updates, session-scoped data
 // ============================================
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import QRCode from 'react-qr-code';
 import { Layout } from '../components/Layout';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSession } from '../contexts/SessionContext';
+import { useAuth } from '../contexts/AuthContext';
+import { isSessionAdmin } from '../services/storageService';
 import {
   createChallenge,
   startVolunteerPhase,
@@ -17,6 +20,7 @@ import {
   startBettingPhase,
   closeBetting,
   resolveChallenge,
+  resetSession,
 } from '../services/firebaseService';
 import {
   Copy,
@@ -30,22 +34,29 @@ import {
   CheckSquare,
   Loader2,
   QrCode,
-  Timer,
   Coins,
+  RotateCcw,
+  Shield,
+  Sparkles,
+  BarChart3,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export function AdminDashboard() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const { t, formatNumber, formatTimer, isRTL } = useLanguage();
+  const navigate = useNavigate();
+  const { formatNumber, isRTL } = useLanguage();
+  const { setCurrentSessionId } = useAuth();
   const {
-    setSessionId,
-    session,
+    setSessionId: setContextSessionId,
     gameState,
     challenges,
     volunteers,
     contestants,
     odds,
     poolTotal,
+    participants,
+    participantCount,
     isLoading,
   } = useSession();
 
@@ -55,29 +66,19 @@ export function AdminDashboard() {
   const [requiredParticipants, setRequiredParticipants] = useState(2);
   const [selectedVolunteers, setSelectedVolunteers] = useState<string[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [timerSeconds, setTimerSeconds] = useState(0);
 
-  // Set session context
+  // Check admin access and set session context
   useEffect(() => {
-    if (sessionId) {
-      setSessionId(sessionId);
-    }
-  }, [sessionId, setSessionId]);
+    if (!sessionId) return;
 
-  // Timer countdown
-  useEffect(() => {
-    if (!gameState?.timer?.endAt) {
-      setTimerSeconds(0);
+    if (!isSessionAdmin(sessionId)) {
+      navigate(`/join/${sessionId}`);
       return;
     }
 
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.floor((gameState.timer!.endAt - Date.now()) / 1000));
-      setTimerSeconds(remaining);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [gameState?.timer]);
+    setContextSessionId(sessionId);
+    setCurrentSessionId(sessionId);
+  }, [sessionId, navigate, setContextSessionId, setCurrentSessionId]);
 
   const copySessionCode = () => {
     if (sessionId) {
@@ -87,9 +88,17 @@ export function AdminDashboard() {
     }
   };
 
+  const copyJoinLink = () => {
+    if (sessionId) {
+      navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   const handleCreateChallenge = async () => {
     if (!sessionId || !newChallengeName.trim()) return;
-    
+
     setActionLoading('createChallenge');
     try {
       await createChallenge(sessionId, newChallengeName.trim(), requiredParticipants);
@@ -102,7 +111,7 @@ export function AdminDashboard() {
 
   const handleStartVolunteering = async (challengeId: string) => {
     if (!sessionId) return;
-    
+
     setActionLoading('startVolunteering');
     try {
       await startVolunteerPhase(sessionId, challengeId);
@@ -114,7 +123,7 @@ export function AdminDashboard() {
 
   const handleSelectContestants = async (mode: 'MANUAL' | 'RANDOM') => {
     if (!sessionId) return;
-    
+
     setActionLoading('selectContestants');
     try {
       await selectContestants(
@@ -132,10 +141,10 @@ export function AdminDashboard() {
 
   const handleStartBetting = async () => {
     if (!sessionId) return;
-    
+
     setActionLoading('startBetting');
     try {
-      await startBettingPhase(sessionId, 60);
+      await startBettingPhase(sessionId);
     } catch (err) {
       console.error('Failed to start betting:', err);
     }
@@ -144,7 +153,7 @@ export function AdminDashboard() {
 
   const handleCloseBetting = async () => {
     if (!sessionId) return;
-    
+
     setActionLoading('closeBetting');
     try {
       await closeBetting(sessionId);
@@ -156,12 +165,25 @@ export function AdminDashboard() {
 
   const handleDeclareWinner = async (winnerId: string) => {
     if (!sessionId) return;
-    
+
     setActionLoading('declareWinner');
     try {
       await resolveChallenge(sessionId, winnerId);
     } catch (err) {
       console.error('Failed to declare winner:', err);
+    }
+    setActionLoading(null);
+  };
+
+  const handleResetSession = async () => {
+    if (!sessionId) return;
+
+    setActionLoading('resetSession');
+    try {
+      await resetSession(sessionId);
+      setSelectedVolunteers([]);
+    } catch (err) {
+      console.error('Failed to reset session:', err);
     }
     setActionLoading(null);
   };
@@ -185,6 +207,7 @@ export function AdminDashboard() {
   }
 
   const volunteerList = Object.entries(volunteers);
+  const participantList = Object.entries(participants);
   const status = gameState?.status || 'OPEN';
 
   return (
@@ -199,10 +222,13 @@ export function AdminDashboard() {
           >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-display font-bold mb-1">
-                  {t('admin.title')}
-                </h1>
-                <p className="text-surface-400">{t('admin.shareCode')}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="w-5 h-5 text-primary-400" />
+                  <h1 className="text-2xl font-display font-bold">
+                    Admin Dashboard
+                  </h1>
+                </div>
+                <p className="text-surface-400">Share this code with players</p>
               </div>
 
               {/* Session Code */}
@@ -215,6 +241,7 @@ export function AdminDashboard() {
                     onClick={copySessionCode}
                     className="p-2 hover:bg-surface-700 rounded-lg transition-colors"
                     whileTap={{ scale: 0.9 }}
+                    title="Copy code"
                   >
                     {copied ? (
                       <Check className="w-5 h-5 text-green-400" />
@@ -238,7 +265,7 @@ export function AdminDashboard() {
             <AnimatePresence>
               {showQR && (
                 <motion.div
-                  className="mt-4 flex justify-center"
+                  className="mt-4 flex flex-col items-center"
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
@@ -249,6 +276,14 @@ export function AdminDashboard() {
                       size={200}
                     />
                   </div>
+                  <motion.button
+                    onClick={copyJoinLink}
+                    className="mt-3 text-sm text-primary-400 hover:text-primary-300 flex items-center gap-1"
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Copy className="w-4 h-4" />
+                    Copy join link
+                  </motion.button>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -256,9 +291,13 @@ export function AdminDashboard() {
             {/* Status Badges */}
             <div className="flex flex-wrap items-center gap-3 mt-4">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-primary-500/10 border border-primary-500/20 rounded-full">
-                <div className={`w-2 h-2 rounded-full ${
-                  status === 'RESOLVED' ? 'bg-green-500' : 'bg-primary-500 animate-pulse'
-                }`} />
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    status === 'RESOLVED'
+                      ? 'bg-green-500'
+                      : 'bg-primary-500 animate-pulse'
+                  }`}
+                />
                 <span className="text-sm font-medium text-primary-400">
                   {status}
                 </span>
@@ -267,20 +306,9 @@ export function AdminDashboard() {
               <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-800 border border-surface-600 rounded-full">
                 <Users className="w-4 h-4 text-surface-400" />
                 <span className="text-sm font-medium">
-                  {session?.participantCount || 0} {t('admin.participants')}
+                  {participantCount} players
                 </span>
               </div>
-
-              {timerSeconds > 0 && (
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
-                  timerSeconds < 10
-                    ? 'bg-red-500/10 border border-red-500/30 text-red-400'
-                    : 'bg-accent-500/10 border border-accent-500/30 text-accent-400'
-                }`}>
-                  <Timer className="w-4 h-4" />
-                  <span className="font-mono font-bold">{formatTimer(timerSeconds)}</span>
-                </div>
-              )}
 
               {poolTotal > 0 && (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-accent-500/10 border border-accent-500/30 rounded-full text-accent-400">
@@ -288,6 +316,15 @@ export function AdminDashboard() {
                   <span className="font-bold">{formatNumber(poolTotal)}</span>
                 </div>
               )}
+
+              {/* Leaderboard Link */}
+              <Link
+                to={`/leaderboard/${sessionId}`}
+                className="flex items-center gap-2 px-3 py-1.5 bg-primary-500/10 border border-primary-500/30 rounded-full text-primary-400 hover:bg-primary-500/20 transition-colors"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span className="text-sm font-medium">Leaderboard</span>
+              </Link>
             </div>
           </motion.div>
 
@@ -301,7 +338,7 @@ export function AdminDashboard() {
             >
               <h2 className="text-xl font-display font-bold mb-4 flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-primary-400" />
-                {t('admin.challenges')}
+                Challenges
               </h2>
 
               {/* Create Challenge Form */}
@@ -309,7 +346,7 @@ export function AdminDashboard() {
                 <div className="space-y-3 mb-6 p-4 bg-surface-800/50 rounded-xl">
                   <input
                     type="text"
-                    placeholder={t('challenge.name')}
+                    placeholder="Challenge Name"
                     value={newChallengeName}
                     onChange={(e) => setNewChallengeName(e.target.value)}
                     className="input-field"
@@ -318,18 +355,23 @@ export function AdminDashboard() {
                   <div className="flex items-center gap-3">
                     <select
                       value={requiredParticipants}
-                      onChange={(e) => setRequiredParticipants(parseInt(e.target.value))}
+                      onChange={(e) =>
+                        setRequiredParticipants(parseInt(e.target.value))
+                      }
                       className="input-field flex-1"
                     >
                       {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
                         <option key={n} value={n}>
-                          {n} {t('challenge.participants')}
+                          {n} Contestants
                         </option>
                       ))}
                     </select>
                     <motion.button
                       onClick={handleCreateChallenge}
-                      disabled={!newChallengeName.trim() || actionLoading === 'createChallenge'}
+                      disabled={
+                        !newChallengeName.trim() ||
+                        actionLoading === 'createChallenge'
+                      }
                       className="btn-primary flex items-center gap-2"
                       whileTap={{ scale: 0.95 }}
                     >
@@ -354,7 +396,7 @@ export function AdminDashboard() {
                       <div>
                         <h3 className="font-semibold">{challenge.name}</h3>
                         <p className="text-sm text-surface-400">
-                          {challenge.requiredParticipants} participants
+                          {challenge.requiredParticipants} participants • {challenge.status}
                         </p>
                       </div>
                       {status === 'OPEN' && challenge.status === 'PENDING' && (
@@ -369,7 +411,7 @@ export function AdminDashboard() {
                           ) : (
                             <>
                               <Play className="w-4 h-4" />
-                              <span>{t('admin.startVolunteering')}</span>
+                              <span>Start</span>
                             </>
                           )}
                         </motion.button>
@@ -377,10 +419,10 @@ export function AdminDashboard() {
                     </div>
                   </div>
                 ))}
-                
+
                 {challenges.length === 0 && (
                   <p className="text-center text-surface-400 py-8">
-                    {t('admin.createChallenge')} to get started
+                    Create a challenge to get started
                   </p>
                 )}
               </div>
@@ -395,11 +437,11 @@ export function AdminDashboard() {
             >
               <h2 className="text-xl font-display font-bold mb-4 flex items-center gap-2">
                 <Users className="w-5 h-5 text-accent-400" />
-                {status === 'VOLUNTEERING' ? 'Volunteers' : 'Contestants'}
+                {status === 'VOLUNTEERING' && contestants.length < 2 ? 'Volunteers' : 'Contestants'}
               </h2>
 
-              {/* Volunteer Phase Controls */}
-              {status === 'VOLUNTEERING' && (
+              {/* Volunteer Phase - Selection (only show when no contestants selected yet) */}
+              {status === 'VOLUNTEERING' && contestants.length < 2 && (
                 <>
                   <div className="space-y-2 mb-4">
                     {volunteerList.map(([id, data]) => (
@@ -412,14 +454,18 @@ export function AdminDashboard() {
                         }`}
                         onClick={() => toggleVolunteerSelection(id)}
                         whileTap={{ scale: 0.98 }}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                              selectedVolunteers.includes(id)
-                                ? 'bg-primary-500 border-primary-500'
-                                : 'border-surface-500'
-                            }`}>
+                            <div
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                selectedVolunteers.includes(id)
+                                  ? 'bg-primary-500 border-primary-500'
+                                  : 'border-surface-500'
+                              }`}
+                            >
                               {selectedVolunteers.includes(id) && (
                                 <Check className="w-3 h-3 text-white" />
                               )}
@@ -440,30 +486,92 @@ export function AdminDashboard() {
                     <div className="flex gap-3">
                       <motion.button
                         onClick={() => handleSelectContestants('MANUAL')}
-                        disabled={selectedVolunteers.length < 2 || actionLoading === 'selectContestants'}
+                        disabled={
+                          selectedVolunteers.length < 2 ||
+                          actionLoading === 'selectContestants'
+                        }
                         className="btn-primary flex-1 flex items-center justify-center gap-2"
                         whileTap={{ scale: 0.95 }}
                       >
                         <CheckSquare className="w-5 h-5" />
-                        <span>{t('volunteer.selectManual')}</span>
+                        <span>Manual Select</span>
                       </motion.button>
                       <motion.button
                         onClick={() => handleSelectContestants('RANDOM')}
-                        disabled={volunteerList.length < 2 || actionLoading === 'selectContestants'}
+                        disabled={
+                          volunteerList.length < 2 ||
+                          actionLoading === 'selectContestants'
+                        }
                         className="btn-secondary flex-1 flex items-center justify-center gap-2"
                         whileTap={{ scale: 0.95 }}
                       >
                         <Shuffle className="w-5 h-5" />
-                        <span>{t('volunteer.selectRandom')}</span>
+                        <span>Random Select</span>
                       </motion.button>
                     </div>
                   )}
 
                   {volunteerList.length === 0 && (
-                    <p className="text-center text-surface-400 py-8">
-                      Waiting for volunteers...
-                    </p>
+                    <div className="text-center py-8">
+                      <Users className="w-12 h-12 text-surface-600 mx-auto mb-3" />
+                      <p className="text-surface-400">
+                        Waiting for volunteers...
+                      </p>
+                      <p className="text-sm text-surface-500 mt-1">
+                        Players can volunteer using the ALL-IN button
+                      </p>
+                    </div>
                   )}
+                </>
+              )}
+
+              {/* Contestants Selected - Ready to Start Betting */}
+              {status === 'VOLUNTEERING' && contestants.length >= 2 && (
+                <>
+                  <div className="space-y-3 mb-4">
+                    {contestants.map((id) => {
+                      const volunteer = volunteers[id];
+                      return (
+                        <motion.div
+                          key={id}
+                          className="p-4 bg-primary-500/10 rounded-xl border border-primary-500/30"
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
+                                <Trophy className="w-4 h-4 text-white" />
+                              </div>
+                              <span className="font-semibold">
+                                {volunteer?.firstName} {volunteer?.lastName}
+                              </span>
+                            </div>
+                            <span className="text-accent-400 font-bold">
+                              {formatNumber(volunteer?.balanceLocked || 0)} 🍎
+                            </span>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                  <motion.button
+                    onClick={handleStartBetting}
+                    disabled={actionLoading === 'startBetting'}
+                    className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-lg"
+                    whileTap={{ scale: 0.95 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    {actionLoading === 'startBetting' ? (
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <>
+                        <Play className="w-6 h-6" />
+                        <span>Start Betting Phase</span>
+                      </>
+                    )}
+                  </motion.button>
                 </>
               )}
 
@@ -474,7 +582,7 @@ export function AdminDashboard() {
                     {contestants.map((id) => {
                       const volunteer = volunteers[id];
                       const contestantOdds = odds[id] || 0;
-                      
+
                       return (
                         <div
                           key={id}
@@ -499,7 +607,7 @@ export function AdminDashboard() {
                                 whileTap={{ scale: 0.95 }}
                               >
                                 <Trophy className="w-4 h-4" />
-                                <span>{t('admin.declareWinner')}</span>
+                                <span>Winner</span>
                               </motion.button>
                             )}
                           </div>
@@ -516,36 +624,77 @@ export function AdminDashboard() {
                       whileTap={{ scale: 0.95 }}
                     >
                       <Pause className="w-5 h-5" />
-                      <span>{t('admin.closeBetting')}</span>
+                      <span>Close Betting</span>
                     </motion.button>
                   )}
                 </>
               )}
 
-              {/* Start Betting Button */}
-              {contestants.length >= 2 && status !== 'BETTING' && status !== 'IN_PROGRESS' && status !== 'RESOLVED' && (
-                <motion.button
-                  onClick={handleStartBetting}
-                  disabled={actionLoading === 'startBetting'}
-                  className="btn-primary w-full flex items-center justify-center gap-2"
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Play className="w-5 h-5" />
-                  <span>{t('admin.startBetting')}</span>
-                </motion.button>
-              )}
-
               {/* Resolved State */}
               {status === 'RESOLVED' && gameState?.winnerId && (
                 <div className="text-center py-8">
-                  <Trophy className="w-16 h-16 text-accent-400 mx-auto mb-4" />
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                  >
+                    <Trophy className="w-16 h-16 text-accent-400 mx-auto mb-4" />
+                  </motion.div>
                   <h3 className="text-2xl font-display font-bold mb-2">
-                    {t('result.winner')}
+                    Winner! 🎉
                   </h3>
-                  <p className="text-xl">
+                  <p className="text-xl mb-6">
                     {volunteers[gameState.winnerId]?.firstName}{' '}
                     {volunteers[gameState.winnerId]?.lastName}
                   </p>
+
+                  <motion.button
+                    onClick={handleResetSession}
+                    disabled={actionLoading === 'resetSession'}
+                    className="btn-primary flex items-center justify-center gap-2 mx-auto"
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {actionLoading === 'resetSession' ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <RotateCcw className="w-5 h-5" />
+                        <span>New Round</span>
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+              )}
+
+              {/* Open State - Show Participants */}
+              {status === 'OPEN' && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-surface-400 mb-3 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Participants ({participantCount})
+                  </h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {participantList.map(([id, data]) => (
+                      <motion.div
+                        key={id}
+                        className="flex items-center justify-between p-2 bg-surface-800/30 rounded-lg"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                      >
+                        <span className="text-sm">
+                          {data.firstName} {data.lastName}
+                        </span>
+                        <span className="text-sm text-accent-400">
+                          {formatNumber(data.balance)} 🍎
+                        </span>
+                      </motion.div>
+                    ))}
+                    {participantList.length === 0 && (
+                      <p className="text-sm text-surface-500 text-center py-4">
+                        No players yet. Share the code!
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </motion.div>
@@ -555,4 +704,3 @@ export function AdminDashboard() {
     </Layout>
   );
 }
-

@@ -173,15 +173,12 @@ export async function selectContestants(
 // ============================================
 
 export async function startBettingPhase(
-  sessionId: string,
-  duration?: number
+  sessionId: string
 ): Promise<{ success: boolean }> {
   return callFunction<{
     sessionId: string;
-    duration?: number;
   }, { success: boolean }>('startBettingPhase', {
     sessionId,
-    duration,
   });
 }
 
@@ -368,13 +365,20 @@ export function subscribeToSession(
 ): Unsubscribe {
   const docRef = doc(db, 'sessions', sessionId);
   
-  return onSnapshot(docRef, (snapshot) => {
-    if (snapshot.exists()) {
-      callback({ id: snapshot.id, ...snapshot.data() } as Session);
-    } else {
+  return onSnapshot(
+    docRef,
+    (snapshot) => {
+      if (snapshot.exists()) {
+        callback({ id: snapshot.id, ...snapshot.data() } as Session);
+      } else {
+        callback(null);
+      }
+    },
+    (error) => {
+      console.error('Error subscribing to session:', error);
       callback(null);
     }
-  });
+  );
 }
 
 export function subscribeToChallenges(
@@ -384,27 +388,41 @@ export function subscribeToChallenges(
   const challengesRef = collection(db, 'sessions', sessionId, 'challenges');
   const q = query(challengesRef, orderBy('createdAt', 'desc'));
   
-  return onSnapshot(q, (snapshot) => {
-    const challenges = snapshot.docs.map((docSnap) => ({
-      id: docSnap.id,
-      ...docSnap.data(),
-    })) as Challenge[];
-    callback(challenges);
-  });
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const challenges = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      })) as Challenge[];
+      callback(challenges);
+    },
+    (error) => {
+      console.error('Error subscribing to challenges:', error);
+      callback([]);
+    }
+  );
 }
 
 export function subscribeToParticipantFirestore(
   sessionId: string,
-  userId: string,
+  participantUserId: string,
   callback: (participant: Participant | null) => void
 ): Unsubscribe {
-  const docRef = doc(db, 'sessions', sessionId, 'participants', userId);
+  const docRef = doc(db, 'sessions', sessionId, 'participants', participantUserId);
   
-  return onSnapshot(docRef, (snapshot) => {
-    if (snapshot.exists()) {
-      callback(snapshot.data() as Participant);
-    } else {
+  return onSnapshot(
+    docRef,
+    (snapshot) => {
+      if (snapshot.exists()) {
+        callback(snapshot.data() as Participant);
+      } else {
+        callback(null);
+      }
+    },
+    (error) => {
+      console.error('Error subscribing to participant:', error);
       callback(null);
     }
-  });
+  );
 }

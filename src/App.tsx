@@ -11,6 +11,7 @@ import { HomePage } from './pages/HomePage';
 import { JoinPage } from './pages/JoinPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { PlayerView } from './pages/PlayerView';
+import { Leaderboard } from './pages/Leaderboard';
 import './index.css';
 
 function App() {
@@ -32,6 +33,9 @@ function App() {
               
               {/* Player View */}
               <Route path="/play/:sessionId" element={<PlayerView />} />
+              
+              {/* Leaderboard */}
+              <Route path="/leaderboard/:sessionId" element={<Leaderboard />} />
               
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />
