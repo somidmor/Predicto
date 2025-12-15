@@ -1,0 +1,206 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Syne:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: 217 70 239;
+    --color-accent: 251 191 36;
+    --color-surface: 15 23 42;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-surface-950 text-white antialiased;
+    font-family: 'Outfit', 'Vazirmatn', system-ui, sans-serif;
+  }
+
+  /* RTL Support */
+  html[dir="rtl"] body {
+    font-family: 'Vazirmatn', 'Outfit', system-ui, sans-serif;
+  }
+
+  html[dir="rtl"] {
+    direction: rtl;
+  }
+
+  /* Persian numerals for RTL */
+  html[dir="rtl"] .numeric {
+    font-family: 'Vazirmatn', system-ui, sans-serif;
+    font-feature-settings: "ss01";
+  }
+}
+
+@layer components {
+  /* Glass morphism cards */
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:bg-white/10 hover:border-white/20 hover:shadow-xl hover:shadow-primary-500/10;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-400 via-primary-300 to-accent-400 bg-clip-text text-transparent;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply relative px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-500 rounded-xl font-semibold text-white;
+    @apply transition-all duration-300 hover:from-primary-500 hover:to-primary-400;
+    @apply shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/40;
+    @apply active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Secondary button */
+  .btn-secondary {
+    @apply px-6 py-3 bg-surface-800/50 border border-surface-600 rounded-xl font-semibold text-white;
+    @apply transition-all duration-300 hover:bg-surface-700/50 hover:border-surface-500;
+    @apply active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Accent button */
+  .btn-accent {
+    @apply px-6 py-3 bg-gradient-to-r from-accent-500 to-accent-400 rounded-xl font-semibold text-surface-900;
+    @apply transition-all duration-300 hover:from-accent-400 hover:to-accent-300;
+    @apply shadow-lg shadow-accent-500/25 hover:shadow-xl hover:shadow-accent-500/40;
+    @apply active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Input fields */
+  .input-field {
+    @apply w-full px-4 py-3 bg-surface-800/50 border border-surface-600 rounded-xl;
+    @apply text-white placeholder-surface-400;
+    @apply transition-all duration-200 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20;
+  }
+
+  /* Betting odds badge */
+  .odds-badge {
+    @apply inline-flex items-center px-3 py-1 bg-gradient-to-r from-accent-500/20 to-accent-400/20;
+    @apply border border-accent-500/30 rounded-full text-accent-400 font-bold text-sm;
+  }
+
+  /* Live indicator */
+  .live-indicator {
+    @apply inline-flex items-center gap-2 px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full text-red-400 text-sm font-medium;
+  }
+
+  .live-indicator::before {
+    content: '';
+    @apply w-2 h-2 bg-red-500 rounded-full animate-pulse;
+  }
+
+  /* Currency display */
+  .currency-display {
+    @apply inline-flex items-center gap-1 font-bold;
+  }
+
+  .currency-display .amount {
+    @apply text-accent-400;
+  }
+
+  .currency-display .symbol {
+    @apply text-accent-500/70 text-sm;
+  }
+
+  /* Mesh background */
+  .mesh-bg {
+    background: 
+      radial-gradient(at 20% 30%, rgba(217, 70, 239, 0.15) 0px, transparent 50%),
+      radial-gradient(at 80% 70%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+      radial-gradient(at 50% 50%, rgba(251, 191, 36, 0.05) 0px, transparent 70%),
+      linear-gradient(180deg, #020617 0%, #0f172a 100%);
+  }
+
+  /* Animated gradient border */
+  .gradient-border {
+    position: relative;
+  }
+
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(45deg, #d946ef, #8b5cf6, #fbbf24, #d946ef);
+    background-size: 400% 400%;
+    border-radius: inherit;
+    z-index: -1;
+    animation: gradient-rotate 3s ease infinite;
+  }
+
+  @keyframes gradient-rotate {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  /* Contestant card */
+  .contestant-card {
+    @apply relative overflow-hidden glass-card p-6;
+    @apply transition-all duration-300 hover:scale-[1.02];
+  }
+
+  .contestant-card.selected {
+    @apply border-primary-500 bg-primary-500/10;
+  }
+
+  .contestant-card.winner {
+    @apply border-accent-500 bg-accent-500/10;
+  }
+
+  /* Timer display */
+  .timer-display {
+    @apply inline-flex items-center justify-center min-w-[120px] px-6 py-3;
+    @apply bg-surface-800/80 border border-surface-600 rounded-2xl;
+    @apply font-display font-bold text-3xl tabular-nums tracking-wider;
+  }
+
+  .timer-display.warning {
+    @apply border-accent-500/50 text-accent-400;
+  }
+
+  .timer-display.critical {
+    @apply border-red-500/50 text-red-400 animate-pulse;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Text shadow utilities */
+  .text-shadow {
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+
+  .text-shadow-lg {
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Shimmer effect */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+}
+

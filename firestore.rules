@@ -1,0 +1,57 @@
+rules_version = '2';
+
+// ============================================
+// PREDICTO - Firestore Security Rules
+// ============================================
+// Since we're not using Firebase Auth, we rely on
+// Cloud Functions for write operations and allow
+// reads for session data.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection
+    // Read: Anyone with the userId can read their own profile
+    // Write: Only via Cloud Functions (server-side)
+    match /users/{userId} {
+      // Allow reads - users need to see their own balance
+      allow read: if true;
+      
+      // Writes must come from Cloud Functions (admin SDK bypasses rules)
+      allow write: if false;
+    }
+    
+    // Sessions collection
+    match /sessions/{sessionId} {
+      // Allow reads for session data
+      allow read: if true;
+      
+      // Writes only via Cloud Functions
+      allow write: if false;
+      
+      // Challenges subcollection
+      match /challenges/{challengeId} {
+        allow read: if true;
+        allow write: if false;
+      }
+      
+      // Bets subcollection (audit trail)
+      match /bets/{betId} {
+        // Users can read their own bets
+        allow read: if true;
+        allow write: if false;
+      }
+      
+      // Transactions subcollection
+      match /transactions/{transactionId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+    
+    // Deny all other access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

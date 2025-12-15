@@ -1,0 +1,67 @@
+{
+  "rules": {
+    "sessions": {
+      "$sessionId": {
+        // Allow reads for real-time game state
+        ".read": true,
+        
+        // Writes only via Cloud Functions (admin SDK)
+        ".write": false,
+        
+        "status": {
+          ".read": true,
+          ".write": false
+        },
+        
+        "timer": {
+          ".read": true,
+          ".write": false
+        },
+        
+        "volunteers": {
+          ".read": true,
+          ".write": false,
+          
+          "$volunteerId": {
+            ".read": true,
+            ".write": false
+          }
+        },
+        
+        "contestants": {
+          ".read": true,
+          ".write": false
+        },
+        
+        "bets": {
+          ".read": true,
+          ".write": false,
+          
+          "$contestantId": {
+            ".read": true,
+            ".write": false
+          }
+        },
+        
+        "odds": {
+          ".read": true,
+          ".write": false
+        },
+        
+        "poolTotal": {
+          ".read": true,
+          ".write": false
+        },
+        
+        "winnerId": {
+          ".read": true,
+          ".write": false
+        }
+      }
+    },
+    
+    // Deny all other access
+    ".read": false,
+    ".write": false
+  }
+}
