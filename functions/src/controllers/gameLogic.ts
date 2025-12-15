@@ -152,6 +152,44 @@ export const startVolunteerPhase = onCall<StartVolunteerPhaseData>(
 );
 
 // ============================================
+// CLOSE VOLUNTEERING (Move to Selection Phase)
+// ============================================
+
+interface CloseVolunteeringData {
+  sessionId: string;
+}
+
+export const closeVolunteering = onCall<CloseVolunteeringData>(
+  async (request): Promise<{ success: boolean }> => {
+    const { sessionId } = request.data;
+
+    await validateSession(sessionId);
+
+    // Check current status
+    const gameStateSnapshot = await rtdb.ref(`sessions/${sessionId}`).once('value');
+    const gameState = gameStateSnapshot.val();
+
+    if (gameState?.status !== 'VOLUNTEERING') {
+      throw new HttpsError('failed-precondition', 'Not in volunteering phase');
+    }
+
+    // Update Firestore
+    await db.collection('sessions').doc(sessionId).update({
+      status: 'SELECTION',
+    });
+
+    // Update RTDB
+    await rtdb.ref(`sessions/${sessionId}`).update({
+      status: 'SELECTION',
+    });
+
+    logger.info(`Volunteering closed for session ${sessionId}, moving to selection`);
+
+    return { success: true };
+  }
+);
+
+// ============================================
 // VOLUNTEER FOR CHALLENGE (ALL-IN)
 // ============================================
 
@@ -171,6 +209,14 @@ export const volunteerForChallenge = onCall<VolunteerData>(
 
     if (!sessionId || !userId) {
       throw new HttpsError('invalid-argument', 'Missing required fields');
+    }
+
+    // Check game state - only allow volunteering during VOLUNTEERING phase
+    const gameStateSnapshot = await rtdb.ref(`sessions/${sessionId}`).once('value');
+    const gameState = gameStateSnapshot.val();
+
+    if (gameState?.status !== 'VOLUNTEERING') {
+      throw new HttpsError('failed-precondition', 'Volunteering is not open');
     }
 
     // Get participant data
@@ -231,6 +277,14 @@ export const selectContestants = onCall<SelectContestantsData>(
     const { sessionId, mode, selectedIds, count } = request.data;
 
     await validateSession(sessionId);
+
+    // Check game state - only allow selection during SELECTION phase
+    const gameStateSnapshot = await rtdb.ref(`sessions/${sessionId}`).once('value');
+    const gameState = gameStateSnapshot.val();
+
+    if (gameState?.status !== 'SELECTION') {
+      throw new HttpsError('failed-precondition', 'Not in selection phase');
+    }
 
     // Get volunteers from RTDB
     const volunteersSnapshot = await rtdb.ref(`sessions/${sessionId}/volunteers`).once('value');
@@ -326,6 +380,18 @@ export const startBettingPhase = onCall<StartBettingPhaseData>(
     const { sessionId } = request.data;
 
     await validateSession(sessionId);
+
+    // Check game state - must be in SELECTION phase with contestants selected
+    const gameStateSnapshot = await rtdb.ref(`sessions/${sessionId}`).once('value');
+    const gameState = gameStateSnapshot.val();
+
+    if (gameState?.status !== 'SELECTION') {
+      throw new HttpsError('failed-precondition', 'Must be in selection phase');
+    }
+
+    if (!gameState?.contestants || gameState.contestants.length < 2) {
+      throw new HttpsError('failed-precondition', 'Contestants must be selected first');
+    }
 
     // Update Firestore
     await db.collection('sessions').doc(sessionId).update({

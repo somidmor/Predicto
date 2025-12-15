@@ -15,6 +15,7 @@ export {
 export {
   createChallenge,
   startVolunteerPhase,
+  closeVolunteering,
   volunteerForChallenge,
   selectContestants,
   startBettingPhase,

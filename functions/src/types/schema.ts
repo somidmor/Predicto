@@ -4,10 +4,10 @@
 // ============================================
 
 // Session Status
-export type SessionStatus = 'OPEN' | 'VOLUNTEERING' | 'BETTING' | 'IN_PROGRESS' | 'RESOLVED';
+export type SessionStatus = 'OPEN' | 'VOLUNTEERING' | 'SELECTION' | 'BETTING' | 'IN_PROGRESS' | 'RESOLVED';
 
 // Challenge Status
-export type ChallengeStatus = 'PENDING' | 'VOLUNTEERING' | 'BETTING' | 'IN_PROGRESS' | 'RESOLVED';
+export type ChallengeStatus = 'PENDING' | 'VOLUNTEERING' | 'SELECTION' | 'BETTING' | 'IN_PROGRESS' | 'RESOLVED';
 
 // Selection Mode
 export type SelectionMode = 'MANUAL' | 'RANDOM';

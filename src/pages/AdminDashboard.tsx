@@ -16,6 +16,7 @@ import { isSessionAdmin } from '../services/storageService';
 import {
   createChallenge,
   startVolunteerPhase,
+  closeVolunteering,
   selectContestants,
   startBettingPhase,
   closeBetting,
@@ -117,6 +118,18 @@ export function AdminDashboard() {
       await startVolunteerPhase(sessionId, challengeId);
     } catch (err) {
       console.error('Failed to start volunteering:', err);
+    }
+    setActionLoading(null);
+  };
+
+  const handleCloseVolunteering = async () => {
+    if (!sessionId) return;
+
+    setActionLoading('closeVolunteering');
+    try {
+      await closeVolunteering(sessionId);
+    } catch (err) {
+      console.error('Failed to close volunteering:', err);
     }
     setActionLoading(null);
   };
@@ -440,9 +453,67 @@ export function AdminDashboard() {
                 {status === 'VOLUNTEERING' && contestants.length < 2 ? 'Volunteers' : 'Contestants'}
               </h2>
 
-              {/* Volunteer Phase - Selection (only show when no contestants selected yet) */}
-              {status === 'VOLUNTEERING' && contestants.length < 2 && (
+              {/* VOLUNTEERING Phase - Players can volunteer, show "End Volunteer Period" button */}
+              {status === 'VOLUNTEERING' && (
                 <>
+                  {/* Volunteer List (read-only, no selection) */}
+                  <div className="space-y-2 mb-4">
+                    {volunteerList.map(([id, data]) => (
+                      <motion.div
+                        key={id}
+                        className="p-3 rounded-xl border bg-surface-800/50 border-surface-700"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">
+                            {data.firstName} {data.lastName}
+                          </span>
+                          <span className="text-accent-400 font-bold">
+                            {formatNumber(data.balanceLocked)} 🍎
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {volunteerList.length === 0 && (
+                    <div className="text-center py-8">
+                      <Users className="w-12 h-12 text-surface-600 mx-auto mb-3" />
+                      <p className="text-surface-400">
+                        Waiting for volunteers...
+                      </p>
+                      <p className="text-sm text-surface-500 mt-1">
+                        Players can volunteer using the ALL-IN button
+                      </p>
+                    </div>
+                  )}
+
+                  {/* End Volunteer Period Button */}
+                  {volunteerList.length >= 2 && (
+                    <motion.button
+                      onClick={handleCloseVolunteering}
+                      disabled={actionLoading === 'closeVolunteering'}
+                      className="btn-secondary w-full flex items-center justify-center gap-2 py-3"
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {actionLoading === 'closeVolunteering' ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <>
+                          <Pause className="w-5 h-5" />
+                          <span>End Volunteer Period</span>
+                        </>
+                      )}
+                    </motion.button>
+                  )}
+                </>
+              )}
+
+              {/* SELECTION Phase - Volunteering closed, show selection buttons */}
+              {status === 'SELECTION' && contestants.length < 2 && (
+                <>
+                  {/* Volunteer List with selection checkboxes */}
                   <div className="space-y-2 mb-4">
                     {volunteerList.map(([id, data]) => (
                       <motion.div
@@ -482,51 +553,50 @@ export function AdminDashboard() {
                     ))}
                   </div>
 
-                  {volunteerList.length > 0 && (
-                    <div className="flex gap-3">
-                      <motion.button
-                        onClick={() => handleSelectContestants('MANUAL')}
-                        disabled={
-                          selectedVolunteers.length < 2 ||
-                          actionLoading === 'selectContestants'
-                        }
-                        className="btn-primary flex-1 flex items-center justify-center gap-2"
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <CheckSquare className="w-5 h-5" />
-                        <span>Manual Select</span>
-                      </motion.button>
-                      <motion.button
-                        onClick={() => handleSelectContestants('RANDOM')}
-                        disabled={
-                          volunteerList.length < 2 ||
-                          actionLoading === 'selectContestants'
-                        }
-                        className="btn-secondary flex-1 flex items-center justify-center gap-2"
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <Shuffle className="w-5 h-5" />
-                        <span>Random Select</span>
-                      </motion.button>
-                    </div>
-                  )}
-
-                  {volunteerList.length === 0 && (
-                    <div className="text-center py-8">
-                      <Users className="w-12 h-12 text-surface-600 mx-auto mb-3" />
-                      <p className="text-surface-400">
-                        Waiting for volunteers...
-                      </p>
-                      <p className="text-sm text-surface-500 mt-1">
-                        Players can volunteer using the ALL-IN button
-                      </p>
-                    </div>
-                  )}
+                  {/* Selection Buttons */}
+                  <div className="flex gap-3">
+                    <motion.button
+                      onClick={() => handleSelectContestants('MANUAL')}
+                      disabled={
+                        selectedVolunteers.length < 2 ||
+                        actionLoading === 'selectContestants'
+                      }
+                      className="btn-primary flex-1 flex items-center justify-center gap-2"
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {actionLoading === 'selectContestants' ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <>
+                          <CheckSquare className="w-5 h-5" />
+                          <span>Manual Select</span>
+                        </>
+                      )}
+                    </motion.button>
+                    <motion.button
+                      onClick={() => handleSelectContestants('RANDOM')}
+                      disabled={
+                        volunteerList.length < 2 ||
+                        actionLoading === 'selectContestants'
+                      }
+                      className="btn-secondary flex-1 flex items-center justify-center gap-2"
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {actionLoading === 'selectContestants' ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <>
+                          <Shuffle className="w-5 h-5" />
+                          <span>Random Select</span>
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
                 </>
               )}
 
-              {/* Contestants Selected - Ready to Start Betting */}
-              {status === 'VOLUNTEERING' && contestants.length >= 2 && (
+              {/* Contestants Selected - Ready to Start Betting (ONLY Start Betting button) */}
+              {status === 'SELECTION' && contestants.length >= 2 && (
                 <>
                   <div className="space-y-3 mb-4">
                     {contestants.map((id) => {

@@ -7,10 +7,10 @@
 export type UserRole = 'ADMIN' | 'GUEST';
 
 // Session Status
-export type SessionStatus = 'OPEN' | 'VOLUNTEERING' | 'BETTING' | 'IN_PROGRESS' | 'RESOLVED';
+export type SessionStatus = 'OPEN' | 'VOLUNTEERING' | 'SELECTION' | 'BETTING' | 'IN_PROGRESS' | 'RESOLVED';
 
 // Challenge Status
-export type ChallengeStatus = 'PENDING' | 'VOLUNTEERING' | 'BETTING' | 'IN_PROGRESS' | 'RESOLVED';
+export type ChallengeStatus = 'PENDING' | 'VOLUNTEERING' | 'SELECTION' | 'BETTING' | 'IN_PROGRESS' | 'RESOLVED';
 
 // Transaction Types
 export type TransactionType = 

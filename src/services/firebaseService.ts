@@ -168,6 +168,16 @@ export async function selectContestants(
   });
 }
 
+export async function closeVolunteering(
+  sessionId: string
+): Promise<{ success: boolean }> {
+  return callFunction<{
+    sessionId: string;
+  }, { success: boolean }>('closeVolunteering', {
+    sessionId,
+  });
+}
+
 // ============================================
 // Betting Actions
 // ============================================

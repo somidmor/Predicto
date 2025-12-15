@@ -279,8 +279,8 @@ export function PlayerView() {
             </motion.div>
           )}
 
-          {/* Volunteer Status - Waiting for selection */}
-          {isVolunteer && !isContestant && status === 'VOLUNTEERING' && (
+          {/* Volunteer Status - Waiting for selection (VOLUNTEERING or SELECTION state) */}
+          {isVolunteer && !isContestant && (status === 'VOLUNTEERING' || status === 'SELECTION') && (
             <motion.div
               className="glass-card p-6 text-center"
               initial={{ opacity: 0, y: 20 }}
@@ -288,7 +288,7 @@ export function PlayerView() {
             >
               <Loader2 className="w-12 h-12 text-primary-500 animate-spin mx-auto mb-4" />
               <h2 className="text-xl font-display font-bold mb-2">
-                Waiting for Selection
+                {status === 'SELECTION' ? 'Selection in Progress' : 'Waiting for Selection'}
               </h2>
               <p className="text-surface-400">
                 {formatCurrency(volunteerData?.balanceLocked || lockedBalance)} locked
@@ -296,8 +296,25 @@ export function PlayerView() {
             </motion.div>
           )}
 
+          {/* Volunteering Closed - for non-volunteers during SELECTION */}
+          {!isVolunteer && status === 'SELECTION' && (
+            <motion.div
+              className="glass-card p-6 text-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Lock className="w-12 h-12 text-surface-400 mx-auto mb-4" />
+              <h2 className="text-xl font-display font-bold text-surface-400 mb-2">
+                Volunteering Closed
+              </h2>
+              <p className="text-surface-500">
+                Host is selecting contestants...
+              </p>
+            </motion.div>
+          )}
+
           {/* Contestant View */}
-          {isContestant && (status === 'BETTING' || status === 'IN_PROGRESS') && (
+          {isContestant && (status === 'SELECTION' || status === 'BETTING' || status === 'IN_PROGRESS') && (
             <motion.div
               className="glass-card p-6 text-center border-2 border-primary-500"
               initial={{ opacity: 0, scale: 0.9 }}
