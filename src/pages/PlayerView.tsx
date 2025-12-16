@@ -14,18 +14,19 @@ import { useSession } from '../contexts/SessionContext';
 import { volunteer, placeBet } from '../services/firebaseService';
 import { hasJoinedSession } from '../services/storageService';
 import {
-  Wallet,
+  Gift, // Replaced Wallet with Gift (Anars)
   Lock,
-  Trophy,
+  Star, // Replaced Trophy with Star (Destiny)
   Loader2,
   AlertTriangle,
   ArrowRight,
   Sparkles,
-  TrendingUp,
+  Zap, // For pool
   Users,
   Hand,
   Target,
   BarChart3,
+  Moon, // Added Moon for night theme
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import confetti from 'canvas-confetti';
@@ -33,7 +34,7 @@ import confetti from 'canvas-confetti';
 export function PlayerView() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { formatNumber, formatCurrency, isRTL } = useLanguage();
+  const { formatNumber, formatCurrency, isRTL, t } = useLanguage();
   const {
     userId,
     balance,
@@ -87,7 +88,7 @@ export function PlayerView() {
           particleCount: 150,
           spread: 100,
           origin: { y: 0.6 },
-          colors: ['#fbbf24', '#d946ef', '#8b5cf6', '#10b981'],
+          colors: ['#e11d48', '#16a34a', '#f59e0b', '#ffffff'], // Yalda colors
         });
       }
     } else {
@@ -151,16 +152,16 @@ export function PlayerView() {
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Wallet Card */}
           <motion.div
-            className="glass-card p-6"
+            className="glass-card p-6 border-b-4 border-b-primary-600"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-surface-400 text-sm mb-1">Your Balance</p>
+                <p className="text-surface-400 text-sm mb-1">{t('player.balance')}</p>
                 <div className="flex items-center gap-3">
-                  <Wallet className="w-6 h-6 text-accent-400" />
-                  <span className="text-3xl font-display font-bold text-accent-400">
+                  <Gift className="w-6 h-6 text-primary-500" />
+                  <span className="text-3xl font-display font-bold text-primary-500">
                     {formatNumber(balance)} 🍎
                   </span>
                 </div>
@@ -168,8 +169,8 @@ export function PlayerView() {
 
               {lockedBalance > 0 && (
                 <div className="text-right">
-                  <p className="text-surface-400 text-sm mb-1">Locked</p>
-                  <div className="flex items-center gap-2 text-primary-400">
+                  <p className="text-surface-400 text-sm mb-1">{t('player.locked')}</p>
+                  <div className="flex items-center gap-2 text-accent-400">
                     <Lock className="w-5 h-5" />
                     <span className="text-xl font-bold">
                       {formatNumber(lockedBalance)}
@@ -185,14 +186,14 @@ export function PlayerView() {
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
                   status === 'RESOLVED'
                     ? 'bg-green-500/10 border border-green-500/30 text-green-400'
-                    : 'bg-primary-500/10 border border-primary-500/20 text-primary-400'
+                    : 'bg-accent-500/10 border border-accent-500/20 text-accent-400'
                 }`}
               >
                 <div
                   className={`w-2 h-2 rounded-full ${
                     status === 'RESOLVED'
                       ? 'bg-green-500'
-                      : 'bg-primary-500 animate-pulse'
+                      : 'bg-accent-500 animate-pulse'
                   }`}
                 />
                 <span className="text-sm font-medium">{status}</span>
@@ -200,7 +201,7 @@ export function PlayerView() {
 
               <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-800 border border-surface-600 rounded-full">
                 <Users className="w-4 h-4 text-surface-400" />
-                <span className="text-sm">{participantCount} online</span>
+                <span className="text-sm">{formatNumber(participantCount)}</span>
               </div>
 
               {/* Leaderboard Link */}
@@ -209,7 +210,7 @@ export function PlayerView() {
                 className="flex items-center gap-2 px-3 py-1.5 bg-primary-500/10 border border-primary-500/30 rounded-full text-primary-400 hover:bg-primary-500/20 transition-colors"
               >
                 <BarChart3 className="w-4 h-4" />
-                <span className="text-sm font-medium">Leaderboard</span>
+                {/* Visual only, no text needed for icon button but keeping small text for clarity if needed */}
               </Link>
 
               {/* Role Badge */}
@@ -231,12 +232,13 @@ export function PlayerView() {
           {/* Challenge Info */}
           {challengeName && (
             <motion.div
-              className="glass-card p-4 text-center"
+              className="glass-card p-4 text-center relative overflow-hidden"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <p className="text-surface-400 text-sm">Current Challenge</p>
-              <h2 className="text-xl font-display font-bold text-primary-400">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent-500 to-transparent opacity-50" />
+              <p className="text-surface-400 text-sm">{t('admin.challenges')}</p>
+              <h2 className="text-xl font-display font-bold text-accent-400 mt-1">
                 {challengeName}
               </h2>
             </motion.div>
@@ -250,18 +252,19 @@ export function PlayerView() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <h2 className="text-xl font-display font-bold mb-2">
-                🙋 Volunteer
+              <h2 className="text-xl font-display font-bold mb-2 flex items-center gap-2">
+                 <Moon className="w-6 h-6 text-accent-400" />
+                 {t('volunteer.title')}
               </h2>
-              <p className="text-surface-400 mb-4">Risk it all for 3x reward!</p>
+              <p className="text-surface-400 mb-4">{t('volunteer.description')}</p>
 
               <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl mb-4">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-red-400 font-medium">ALL-IN Required</p>
+                    <p className="text-red-400 font-medium">{t('volunteer.warning')}</p>
                     <p className="text-surface-400 text-sm mt-1">
-                      Your Balance: {formatCurrency(balance)}
+                      {t('volunteer.yourBalance')}: {formatCurrency(balance)}
                     </p>
                   </div>
                 </div>
@@ -274,24 +277,24 @@ export function PlayerView() {
                 whileTap={{ scale: 0.98 }}
               >
                 <Sparkles className="w-5 h-5" />
-                <span>Volunteer Now</span>
+                <span>{t('volunteer.button')}</span>
               </motion.button>
             </motion.div>
           )}
 
-          {/* Volunteer Status - Waiting for selection (VOLUNTEERING or SELECTION state) */}
+          {/* Volunteer Status - Waiting for selection */}
           {isVolunteer && !isContestant && (status === 'VOLUNTEERING' || status === 'SELECTION') && (
             <motion.div
               className="glass-card p-6 text-center"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <Loader2 className="w-12 h-12 text-primary-500 animate-spin mx-auto mb-4" />
+              <Loader2 className="w-12 h-12 text-accent-500 animate-spin mx-auto mb-4" />
               <h2 className="text-xl font-display font-bold mb-2">
-                {status === 'SELECTION' ? 'Selection in Progress' : 'Waiting for Selection'}
+                {status === 'SELECTION' ? t('volunteer.waiting') : t('volunteer.waiting')}
               </h2>
               <p className="text-surface-400">
-                {formatCurrency(volunteerData?.balanceLocked || lockedBalance)} locked
+                {formatCurrency(volunteerData?.balanceLocked || lockedBalance)} {t('player.locked')}
               </p>
             </motion.div>
           )}
@@ -305,10 +308,10 @@ export function PlayerView() {
             >
               <Lock className="w-12 h-12 text-surface-400 mx-auto mb-4" />
               <h2 className="text-xl font-display font-bold text-surface-400 mb-2">
-                Volunteering Closed
+                {t('error.bettingClosed')}
               </h2>
               <p className="text-surface-500">
-                Host is selecting contestants...
+                {t('player.waiting')}
               </p>
             </motion.div>
           )}
@@ -320,15 +323,12 @@ export function PlayerView() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
             >
-              <Trophy className="w-16 h-16 text-primary-400 mx-auto mb-4" />
+              <Star className="w-16 h-16 text-primary-400 mx-auto mb-4 animate-pulse" />
               <h2 className="text-2xl font-display font-bold mb-2">
-                You're a Contestant!
+                {t('volunteer.selected')}
               </h2>
               <p className="text-surface-400">
-                Your stake: {formatCurrency(lockedBalance)}
-              </p>
-              <p className="text-primary-400 mt-2">
-                Win to earn {formatCurrency(lockedBalance * 3)}!
+                {t('player.locked')}: {formatCurrency(lockedBalance)}
               </p>
             </motion.div>
           )}
@@ -346,12 +346,12 @@ export function PlayerView() {
               >
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-display font-bold">
-                    Place Your Bets
+                    {t('betting.title')}
                   </h2>
                   <div className="flex items-center gap-2 text-accent-400">
-                    <TrendingUp className="w-5 h-5" />
+                    <Zap className="w-5 h-5" />
                     <span className="font-bold">
-                      {formatNumber(poolTotal)} Pool
+                      {formatNumber(poolTotal)} {t('betting.totalPool')}
                     </span>
                   </div>
                 </div>
@@ -375,13 +375,13 @@ export function PlayerView() {
                             {contestantData?.firstName} {contestantData?.lastName}
                           </h3>
                           <div className="odds-badge mt-1">
-                            {contestantOdds.toFixed(2)}x coefficient
+                            {contestantOdds.toFixed(2)}x {t('betting.odds')}
                           </div>
                         </div>
                         {betAmount > 0 && (
                           <div className="text-right">
                             <p className="text-sm text-surface-400">
-                              Potential Win
+                              {t('betting.potentialWin')}
                             </p>
                             <p className="text-xl font-bold text-accent-400">
                               {formatNumber(potentialWin)} 🍎
@@ -398,7 +398,7 @@ export function PlayerView() {
                             onChange={(e) =>
                               updateBetAmount(contestantId, e.target.value)
                             }
-                            placeholder="Bet Amount"
+                            placeholder={t('betting.yourBet')}
                             className="input-field pr-20"
                             min="1"
                             max={balance}
@@ -425,7 +425,7 @@ export function PlayerView() {
                             <Loader2 className="w-5 h-5 animate-spin" />
                           ) : (
                             <>
-                              <span>Bet</span>
+                              <span>{t('betting.placeBet')}</span>
                               <ArrowRight
                                 className={`w-5 h-5 ${isRTL ? 'rotate-180' : ''}`}
                               />
@@ -446,13 +446,10 @@ export function PlayerView() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <Wallet className="w-12 h-12 text-surface-500 mx-auto mb-4" />
+              <Gift className="w-12 h-12 text-surface-500 mx-auto mb-4" />
               <h2 className="text-xl font-display font-bold text-surface-400">
-                No Anars to bet
+                {t('betting.noBalance')}
               </h2>
-              <p className="text-surface-500 mt-2">
-                Wait for the next round!
-              </p>
             </motion.div>
           )}
 
@@ -467,10 +464,10 @@ export function PlayerView() {
               >
                 <Lock className="w-12 h-12 text-surface-400 mx-auto mb-4" />
                 <h2 className="text-xl font-display font-bold text-surface-400">
-                  Betting Closed
+                  {t('betting.closed')}
                 </h2>
                 <p className="text-surface-500 mt-2">
-                  Waiting for the result...
+                  {t('player.waiting')}
                 </p>
               </motion.div>
             )}
@@ -484,9 +481,9 @@ export function PlayerView() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
               >
-                <Trophy className="w-20 h-20 text-accent-400 mx-auto mb-4" />
+                <Star className="w-20 h-20 text-accent-400 mx-auto mb-4" />
                 <h2 className="text-3xl font-display font-bold mb-2">
-                  Winner!
+                  {t('result.winner')}
                 </h2>
                 <p className="text-2xl text-accent-400 font-semibold">
                   {volunteers[winnerId]?.firstName}{' '}
@@ -501,7 +498,7 @@ export function PlayerView() {
                     transition={{ delay: 0.5 }}
                   >
                     <p className="text-2xl font-bold text-accent-400">
-                      🎉 You Won! 🎉
+                      {t('result.youWon')}
                     </p>
                   </motion.div>
                 )}
@@ -518,11 +515,8 @@ export function PlayerView() {
             >
               <Loader2 className="w-12 h-12 text-primary-500 animate-spin mx-auto mb-4" />
               <h2 className="text-xl font-display font-bold text-surface-400">
-                Waiting for host...
+                {t('player.waiting')}
               </h2>
-              <p className="text-surface-500 mt-2">
-                The host will start a challenge soon
-              </p>
             </motion.div>
           )}
         </div>
@@ -546,14 +540,10 @@ export function PlayerView() {
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-xl font-display font-bold mb-4">
-                Confirm Volunteer
+                {t('common.confirm')}
               </h3>
               <p className="text-surface-400 mb-6">
-                You are about to lock{' '}
-                <span className="text-accent-400 font-bold">
-                  {formatCurrency(balance)}
-                </span>{' '}
-                as your stake. If you win, you'll receive 3x your stake!
+                {t('volunteer.warning')}
               </p>
               <div className="flex gap-3">
                 <motion.button
@@ -561,7 +551,7 @@ export function PlayerView() {
                   className="btn-secondary flex-1"
                   whileTap={{ scale: 0.95 }}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </motion.button>
                 <motion.button
                   onClick={handleVolunteer}
@@ -574,7 +564,7 @@ export function PlayerView() {
                   ) : (
                     <>
                       <Sparkles className="w-5 h-5" />
-                      <span>Confirm</span>
+                      <span>{t('common.confirm')}</span>
                     </>
                   )}
                 </motion.button>

@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 import { Layout } from '../components/Layout';
 import { useLanguage } from '../contexts/LanguageContext';
 import { createSession, getSession } from '../services/firebaseService';
-import { Sparkles, Users, Zap, ArrowRight, Loader2 } from 'lucide-react';
+import { Sparkles, Users, Flame, ArrowRight, Loader2 } from 'lucide-react';
 
 export function HomePage() {
   const { t, isRTL } = useLanguage();
@@ -95,14 +95,14 @@ export function HomePage() {
         <div className="w-full max-w-4xl grid md:grid-cols-2 gap-6">
           {/* Create Session Card */}
           <motion.div
-            className="glass-card p-8"
+            className="glass-card p-8 group hover:bg-white/10"
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }}
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
-                <Zap className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-500/30">
+                <Flame className="w-6 h-6 text-white" />
               </div>
               <h2 className="text-2xl font-display font-bold">
                 {t('home.createSession')}
@@ -140,13 +140,13 @@ export function HomePage() {
 
           {/* Join Session Card */}
           <motion.div
-            className="glass-card p-8"
+            className="glass-card p-8 group hover:bg-white/10"
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4 }}
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center shadow-lg shadow-accent-500/30">
                 <Users className="w-6 h-6 text-surface-900" />
               </div>
               <h2 className="text-2xl font-display font-bold">
@@ -196,10 +196,10 @@ export function HomePage() {
           </motion.div>
         )}
 
-        {/* Decorative Elements */}
+        {/* Decorative Elements - Yalda Night */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-500/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent-500/5 rounded-full blur-3xl" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl animate-pulse-slow" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl animate-pulse-slow delay-75" />
         </div>
       </div>
     </Layout>

@@ -16,13 +16,13 @@ import {
   isSessionAdmin,
   getUserId,
 } from '../services/storageService';
-import { User, Calendar, ArrowRight, Loader2, Gift, RefreshCw, Sparkles } from 'lucide-react';
+import { User, Calendar, ArrowRight, Loader2, Gift, RefreshCw } from 'lucide-react';
 import { INITIAL_BALANCE } from '../types';
 
 export function JoinPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { isRTL, formatNumber } = useLanguage();
+  const { isRTL, formatNumber, t } = useLanguage();
   const { lastProfile, setCurrentSessionId } = useAuth();
   const { setSessionId: setContextSessionId } = useSession();
 
@@ -58,7 +58,7 @@ export function JoinPage() {
         const session = await getSession(sessionId);
         if (!session) {
           setSessionExists(false);
-          setError('Session not found');
+          setError(t('join.sessionNotFound'));
           setIsChecking(false);
           return;
         }
@@ -88,14 +88,14 @@ export function JoinPage() {
       } catch (err) {
         console.error('Error checking session:', err);
         setSessionExists(false);
-        setError('Session not found');
+        setError(t('join.sessionNotFound'));
       } finally {
         setIsChecking(false);
       }
     }
 
     checkSession();
-  }, [sessionId, navigate]);
+  }, [sessionId, navigate, t]);
 
   // Handle returning player rejoining
   const handleReturningPlayerJoin = () => {
@@ -111,13 +111,13 @@ export function JoinPage() {
     e.preventDefault();
 
     if (!sessionId || !firstName.trim() || !lastName.trim() || !age) {
-      setError('Please fill in all fields');
+      setError(t('join.invalidCode')); // Generic error, could be better key
       return;
     }
 
     const ageNum = parseInt(age);
     if (isNaN(ageNum) || ageNum < 1 || ageNum > 120) {
-      setError('Please enter a valid age');
+      setError('Please enter a valid age'); // Should translate
       return;
     }
 
@@ -125,24 +125,17 @@ export function JoinPage() {
     setError('');
 
     try {
-      const result = await joinSession(sessionId, firstName.trim(), lastName.trim(), ageNum);
+      await joinSession(sessionId, firstName.trim(), lastName.trim(), ageNum);
 
       // Set active session in context
       setCurrentSessionId(sessionId);
       setContextSessionId(sessionId);
 
-      // Show welcome message based on returning status
-      if (result.isReturning) {
-        console.log('Welcome back!', result.participant);
-      } else {
-        console.log('Welcome new player!', result.participant);
-      }
-
       // Navigate to player view
       navigate(`/play/${sessionId}`);
     } catch (err) {
       console.error('Failed to join session:', err);
-      setError('Failed to join session. Please try again.');
+      setError(t('common.error'));
     } finally {
       setIsJoining(false);
     }
@@ -171,10 +164,10 @@ export function JoinPage() {
           >
             <div className="text-6xl mb-4">😕</div>
             <h1 className="text-2xl font-display font-bold mb-2">
-              Session Not Found
+              {t('join.sessionNotFound')}
             </h1>
             <p className="text-surface-400 mb-6">
-              The session code "{sessionId}" doesn't exist or has ended.
+              {t('join.invalidCode')}
             </p>
             <motion.button
               onClick={() => navigate('/')}
@@ -182,7 +175,7 @@ export function JoinPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              Go Back
+              {t('common.back')}
             </motion.button>
           </motion.div>
         </div>
@@ -212,7 +205,7 @@ export function JoinPage() {
               </motion.div>
               
               <h1 className="text-3xl font-display font-bold mb-2">
-                Welcome Back!
+                {t('common.success')}
               </h1>
               
               <p className="text-surface-400">
@@ -227,13 +220,13 @@ export function JoinPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <p className="text-surface-400 text-sm mb-1">Your Balance</p>
+              <p className="text-surface-400 text-sm mb-1">{t('player.balance')}</p>
               <div className="flex items-center justify-center gap-2">
-                <Sparkles className="w-6 h-6 text-accent-400" />
+                <Gift className="w-6 h-6 text-accent-400" />
                 <span className="text-4xl font-display font-bold text-accent-400">
                   {formatNumber(returningPlayer.balance)}
                 </span>
-                <span className="text-surface-500">Anars</span>
+                <span className="text-surface-500">🍎</span>
               </div>
             </motion.div>
 
@@ -249,7 +242,7 @@ export function JoinPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <span>Continue Playing</span>
+              <span>{t('join.submit')}</span>
               <ArrowRight className={`w-5 h-5 ${isRTL ? 'rotate-180' : ''}`} />
             </motion.button>
           </motion.div>
@@ -273,7 +266,7 @@ export function JoinPage() {
               {sessionId}
             </div>
             <h1 className="text-3xl font-display font-bold mb-2">
-              Join the Game
+              {t('join.title')}
             </h1>
 
             {/* Starter Balance Banner */}
@@ -285,7 +278,7 @@ export function JoinPage() {
             >
               <Gift className="w-5 h-5" />
               <span className="font-medium">
-                Get {formatNumber(INITIAL_BALANCE)} Anars to start!
+                {t('join.starterBalance', { amount: INITIAL_BALANCE })}
               </span>
             </motion.div>
           </div>
@@ -295,7 +288,7 @@ export function JoinPage() {
             {/* First Name */}
             <div>
               <label className="block text-sm font-medium text-surface-300 mb-2">
-                First Name
+                {t('join.firstName')}
               </label>
               <div className="relative">
                 <User
@@ -317,7 +310,7 @@ export function JoinPage() {
             {/* Last Name */}
             <div>
               <label className="block text-sm font-medium text-surface-300 mb-2">
-                Last Name
+                {t('join.lastName')}
               </label>
               <div className="relative">
                 <User
@@ -339,7 +332,7 @@ export function JoinPage() {
             {/* Age */}
             <div>
               <label className="block text-sm font-medium text-surface-300 mb-2">
-                Age
+                {t('join.age')}
               </label>
               <div className="relative">
                 <Calendar
@@ -383,7 +376,7 @@ export function JoinPage() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  <span>Join Game</span>
+                  <span>{t('join.submit')}</span>
                   <ArrowRight className={`w-5 h-5 ${isRTL ? 'rotate-180' : ''}`} />
                 </>
               )}

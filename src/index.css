@@ -7,9 +7,10 @@
 
 @layer base {
   :root {
-    --color-primary: 217 70 239;
-    --color-accent: 251 191 36;
-    --color-surface: 15 23 42;
+    --color-primary: 225 29 72; /* Pomegranate Red */
+    --color-secondary: 22 163 74; /* Watermelon Green */
+    --color-accent: 245 158 11; /* Golden Candlelight */
+    --color-surface: 15 5 41; /* Deep Night */
   }
 
   html {
@@ -49,15 +50,16 @@
 
   /* Gradient text */
   .gradient-text {
-    @apply bg-gradient-to-r from-primary-400 via-primary-300 to-accent-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary-400 via-accent-300 to-secondary-400 bg-clip-text text-transparent;
   }
 
-  /* Primary button */
+  /* Primary button - Pomegranate */
   .btn-primary {
-    @apply relative px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-500 rounded-xl font-semibold text-white;
-    @apply transition-all duration-300 hover:from-primary-500 hover:to-primary-400;
-    @apply shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/40;
+    @apply relative px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl font-semibold text-white;
+    @apply transition-all duration-300 hover:from-primary-500 hover:to-primary-600;
+    @apply shadow-lg shadow-primary-900/40 hover:shadow-xl hover:shadow-primary-600/30;
     @apply active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply border border-white/10;
   }
 
   /* Secondary button */
@@ -111,16 +113,16 @@
     @apply text-accent-500/70 text-sm;
   }
 
-  /* Mesh background */
+  /* Mesh background - Yalda Night */
   .mesh-bg {
     background: 
-      radial-gradient(at 20% 30%, rgba(217, 70, 239, 0.15) 0px, transparent 50%),
-      radial-gradient(at 80% 70%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
-      radial-gradient(at 50% 50%, rgba(251, 191, 36, 0.05) 0px, transparent 70%),
-      linear-gradient(180deg, #020617 0%, #0f172a 100%);
+      radial-gradient(at 20% 30%, rgba(225, 29, 72, 0.25) 0px, transparent 50%), /* Red Glow */
+      radial-gradient(at 80% 70%, rgba(22, 163, 74, 0.15) 0px, transparent 50%), /* Green Glow */
+      radial-gradient(at 50% 50%, rgba(245, 158, 11, 0.1) 0px, transparent 70%), /* Gold Glow */
+      linear-gradient(180deg, #0f0529 0%, #1e1b4b 100%); /* Deep Night Base */
   }
 
-  /* Animated gradient border */
+  /* Animated gradient border - Yalda Colors */
   .gradient-border {
     position: relative;
   }
@@ -129,16 +131,26 @@
     content: '';
     position: absolute;
     inset: -2px;
-    background: linear-gradient(45deg, #d946ef, #8b5cf6, #fbbf24, #d946ef);
+    background: linear-gradient(45deg, #e11d48, #16a34a, #f59e0b, #e11d48);
     background-size: 400% 400%;
     border-radius: inherit;
     z-index: -1;
-    animation: gradient-rotate 3s ease infinite;
+    animation: gradient-rotate 6s ease infinite;
   }
 
   @keyframes gradient-rotate {
     0%, 100% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
+  }
+
+  /* Candle Flicker Effect */
+  .candle-flicker {
+    animation: candle 0.1s infinite alternate;
+  }
+
+  @keyframes candle {
+    0% { opacity: 0.9; transform: scale(1); }
+    100% { opacity: 1; transform: scale(1.02); }
   }
 
   /* Contestant card */
