@@ -129,22 +129,41 @@ export function ChallengeManager() {
             <div className="min-h-screen py-8 px-4">
                 <div className="max-w-4xl mx-auto space-y-6">
                     {/* Header */}
-                    <div className="flex items-center gap-4 mb-6">
-                        <motion.button
-                            onClick={() => navigate(`/admin/${sessionId}`)}
-                            className="p-2 hover:bg-surface-800 rounded-full transition-colors flex items-center gap-2 px-4"
-                            whileTap={{ scale: 0.9 }}
-                        >
-                            <ArrowLeft className="w-5 h-5" />
-                            <span className="font-medium">Back to Dashboard</span>
-                        </motion.button>
-                        <div>
-                            <h1 className="text-2xl font-display font-bold flex items-center gap-2">
-                                <Shield className="w-6 h-6 text-primary-400" />
-                                Challenge Manager
-                            </h1>
-                            <p className="text-surface-400">Manage volunteers and contestants</p>
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-4">
+                            <motion.button
+                                onClick={() => navigate(`/admin/${sessionId}`)}
+                                className="p-2 hover:bg-surface-800 rounded-full transition-colors flex items-center gap-2 px-4"
+                                whileTap={{ scale: 0.9 }}
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                                <span className="font-medium">Back to Dashboard</span>
+                            </motion.button>
+                            <div>
+                                <h1 className="text-2xl font-display font-bold flex items-center gap-2">
+                                    <Shield className="w-6 h-6 text-primary-400" />
+                                    Challenge Manager
+                                </h1>
+                                <p className="text-surface-400">Manage volunteers and contestants</p>
+                            </div>
                         </div>
+
+                        <motion.button
+                            onClick={handleCancelChallenge}
+                            disabled={actionLoading === 'cancelChallenge'}
+                            className="btn-secondary border-red-500/50 text-red-400 hover:bg-red-500/10 px-4 py-2 text-sm flex items-center gap-2"
+                            whileTap={{ scale: 0.95 }}
+                            title="Terminate Challenge"
+                        >
+                            {actionLoading === 'cancelChallenge' ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <>
+                                    <AlertTriangle className="w-4 h-4" />
+                                    <span>Terminate</span>
+                                </>
+                            )}
+                        </motion.button>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-6">
@@ -279,39 +298,7 @@ export function ChallengeManager() {
                     </div>
                 </div>
 
-                {/* Danger Zone */}
-                <motion.div
-                    className="glass-card p-6 border-red-500/20 mt-6"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                >
-                    <div className="flex items-center justify-between flex-wrap gap-4">
-                        <div>
-                            <h2 className="text-lg font-bold flex items-center gap-2 text-red-400">
-                                <AlertTriangle className="w-5 h-5" />
-                                Danger Zone
-                            </h2>
-                            <p className="text-sm text-surface-400 mt-1">
-                                Terminate challenge and refund all bets.
-                            </p>
-                        </div>
-                        <motion.button
-                            onClick={handleCancelChallenge}
-                            disabled={actionLoading === 'cancelChallenge'}
-                            className="btn-secondary border-red-500/50 text-red-400 hover:bg-red-500/10 px-4 py-2 text-sm flex items-center gap-2"
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            {actionLoading === 'cancelChallenge' ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <>
-                                    <AlertTriangle className="w-4 h-4" />
-                                    <span>Terminate</span>
-                                </>
-                            )}
-                        </motion.button>
-                    </div>
-                </motion.div>
+
             </div>
 
         </Layout >
