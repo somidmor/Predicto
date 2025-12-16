@@ -37,7 +37,12 @@ try {
 
   // Connect to emulators in development
   if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true') {
+    const { connectFirestoreEmulator } = await import('firebase/firestore');
+    const { connectDatabaseEmulator } = await import('firebase/database');
+
     connectFunctionsEmulator(functions, 'localhost', 5001);
+    connectFirestoreEmulator(db, 'localhost', 8080);
+    connectDatabaseEmulator(rtdb, 'localhost', 9000);
     console.log('🔧 Connected to Firebase Emulators');
   }
 } catch (error) {

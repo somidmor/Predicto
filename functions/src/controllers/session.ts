@@ -106,7 +106,7 @@ export const joinSession = onCall<JoinSessionData>(
         .doc(sessionId)
         .collection('participants')
         .doc(userId);
-      
+
       const participantDoc = await participantRef.get();
 
       let participant: Participant;
@@ -150,6 +150,7 @@ export const joinSession = onCall<JoinSessionData>(
         isVolunteer: participant.isVolunteer,
         isContestant: participant.isContestant,
         joinedAt: participant.joinedAt,
+        age: participant.age,
       });
 
       return { success: true, participant, isReturning };
@@ -239,7 +240,7 @@ export async function validateSession(sessionId: string): Promise<void> {
   }
 
   const sessionDoc = await db.collection('sessions').doc(sessionId).get();
-  
+
   if (!sessionDoc.exists) {
     throw new HttpsError('not-found', 'Session not found');
   }
