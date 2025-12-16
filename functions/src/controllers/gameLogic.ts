@@ -59,13 +59,24 @@ export const createChallenge = onCall<CreateChallengeData>(
   async (request): Promise<{ challengeId: string }> => {
     const { sessionId, name, requiredParticipants, description } = request.data;
 
-    await validateSession(sessionId);
+    // Validate session and check status
+    const sessionRef = db.collection('sessions').doc(sessionId);
+    const sessionDoc = await sessionRef.get();
+
+    if (!sessionDoc.exists) {
+      throw new HttpsError('not-found', 'Session not found');
+    }
+
+    const sessionData = sessionDoc.data();
+    if (sessionData?.status !== 'OPEN') {
+      throw new HttpsError('failed-precondition', 'Cannot create challenge: Session is not OPEN');
+    }
 
     if (!name || requiredParticipants < 2 || requiredParticipants > 10) {
       throw new HttpsError('invalid-argument', 'Invalid challenge parameters');
     }
 
-    const challengeId = db.collection('sessions').doc(sessionId).collection('challenges').doc().id;
+    const challengeId = sessionRef.collection('challenges').doc().id;
     const now = Date.now();
 
     const challenge: Challenge = {
@@ -74,19 +85,37 @@ export const createChallenge = onCall<CreateChallengeData>(
       name,
       description,
       requiredParticipants,
-      status: 'PENDING',
+      status: 'VOLUNTEERING', // Auto-start to VOLUNTEERING
       contestants: [],
       createdAt: now,
     };
 
-    await db
-      .collection('sessions')
-      .doc(sessionId)
-      .collection('challenges')
-      .doc(challengeId)
-      .set(challenge);
+    // Create challenge and update session status in a batch
+    const batch = db.batch();
+    batch.set(sessionRef.collection('challenges').doc(challengeId), challenge);
+    batch.update(sessionRef, {
+      status: 'VOLUNTEERING',
+      currentChallengeId: challengeId,
+    });
+    await batch.commit();
 
-    logger.info(`Challenge ${challengeId} created for session ${sessionId}`);
+    // Update RTDB game state
+    await rtdb.ref(`sessions/${sessionId}`).update({
+      status: 'VOLUNTEERING',
+      challengeId,
+      challengeName: name,
+      requiredParticipants,
+      volunteers: {},
+      contestants: [],
+      bets: {},
+      odds: {},
+      poolTotal: 0,
+      winnerId: null,
+      bettingLocked: true,
+      betCounts: {},
+    });
+
+    logger.info(`Challenge ${challengeId} created and started for session ${sessionId}`);
 
     return { challengeId };
   }
@@ -101,52 +130,12 @@ interface StartVolunteerPhaseData {
   challengeId: string;
 }
 
+// DEPRECATED: Logic moved to createChallenge, but kept for backward compatibility if needed
 export const startVolunteerPhase = onCall<StartVolunteerPhaseData>(
   async (request): Promise<{ success: boolean }> => {
     const { sessionId, challengeId } = request.data;
-
     await validateSession(sessionId);
-
-    // Get challenge
-    const challengeDoc = await db
-      .collection('sessions')
-      .doc(sessionId)
-      .collection('challenges')
-      .doc(challengeId)
-      .get();
-
-    if (!challengeDoc.exists) {
-      throw new HttpsError('not-found', 'Challenge not found');
-    }
-
-    const challenge = challengeDoc.data() as Challenge;
-
-    // Update Firestore
-    const batch = db.batch();
-    batch.update(db.collection('sessions').doc(sessionId), {
-      status: 'VOLUNTEERING',
-      currentChallengeId: challengeId,
-    });
-    batch.update(challengeDoc.ref, { status: 'VOLUNTEERING' });
-    await batch.commit();
-
-    // Update RTDB game state
-    await rtdb.ref(`sessions/${sessionId}`).update({
-      status: 'VOLUNTEERING',
-      challengeId,
-      challengeName: challenge.name,
-      requiredParticipants: challenge.requiredParticipants,
-      volunteers: {},
-      contestants: [],
-      bets: {},
-      odds: {},
-      poolTotal: 0,
-      winnerId: null,
-      bettingLocked: true,
-    });
-
-    logger.info(`Volunteer phase started for session ${sessionId}`);
-
+    // ... logic is now in createChallenge
     return { success: true };
   }
 );
@@ -310,7 +299,7 @@ export const selectContestants = onCall<SelectContestantsData>(
       if (volunteerIds.length < selectCount) {
         throw new HttpsError('failed-precondition', `Not enough volunteers`);
       }
-      
+
       // Fisher-Yates shuffle
       const shuffled = [...volunteerIds];
       for (let i = shuffled.length - 1; i > 0; i--) {
@@ -339,25 +328,37 @@ export const selectContestants = onCall<SelectContestantsData>(
       });
     }
 
-    // Update RTDB
+    // Update RTDB - Set contestants and volunteers
     const selectedVolunteers: Record<string, unknown> = {};
     selected.forEach((id) => {
       selectedVolunteers[id] = volunteers[id];
     });
 
+    // Initialize betting pools
+    const initialBets: Record<string, number> = {};
+    const initialBetCounts: Record<string, number> = {};
+    selected.forEach((id) => {
+      initialBets[id] = 0;
+      initialBetCounts[id] = 0;
+    });
+    await rtdb.ref(`sessions/${sessionId}/bets`).set(initialBets);
+    await rtdb.ref(`sessions/${sessionId}/betCounts`).set(initialBetCounts);
+
+    // AUTO-START BETTING PHASE
+    // Update Firestore
+    await db.collection('sessions').doc(sessionId).update({
+      status: 'BETTING',
+    });
+
+    // Update RTDB
     await rtdb.ref(`sessions/${sessionId}`).update({
       contestants: selected,
       volunteers: selectedVolunteers,
+      status: 'BETTING',
+      bettingLocked: false,
     });
 
-    // Initialize betting pools
-    const initialBets: Record<string, number> = {};
-    selected.forEach((id) => {
-      initialBets[id] = 0;
-    });
-    await rtdb.ref(`sessions/${sessionId}/bets`).set(initialBets);
-
-    logger.info(`Selected ${selected.length} contestants, refunded ${unselected.length}`);
+    logger.info(`Selected ${selected.length} contestants, refunded ${unselected.length}. Betting started.`);
 
     return {
       success: true,
@@ -375,37 +376,12 @@ interface StartBettingPhaseData {
   sessionId: string;
 }
 
+// DEPRECATED: Logic moved to selectContestants
 export const startBettingPhase = onCall<StartBettingPhaseData>(
   async (request): Promise<{ success: boolean }> => {
     const { sessionId } = request.data;
-
     await validateSession(sessionId);
-
-    // Check game state - must be in SELECTION phase with contestants selected
-    const gameStateSnapshot = await rtdb.ref(`sessions/${sessionId}`).once('value');
-    const gameState = gameStateSnapshot.val();
-
-    if (gameState?.status !== 'SELECTION') {
-      throw new HttpsError('failed-precondition', 'Must be in selection phase');
-    }
-
-    if (!gameState?.contestants || gameState.contestants.length < 2) {
-      throw new HttpsError('failed-precondition', 'Contestants must be selected first');
-    }
-
-    // Update Firestore
-    await db.collection('sessions').doc(sessionId).update({
-      status: 'BETTING',
-    });
-
-    // Update RTDB - no timer, host controls everything
-    await rtdb.ref(`sessions/${sessionId}`).update({
-      status: 'BETTING',
-      bettingLocked: false,
-    });
-
-    logger.info(`Betting started for session ${sessionId}`);
-
+    // ... logic is now in selectContestants
     return { success: true };
   }
 );
@@ -483,6 +459,11 @@ export const placeBet = onCall<PlaceBetData>(
     // Update RTDB pool
     await rtdb.ref(`sessions/${sessionId}/bets/${contestantId}`).transaction(
       (current) => (current || 0) + amount
+    );
+
+    // Update RTDB bet counts
+    await rtdb.ref(`sessions/${sessionId}/betCounts/${contestantId}`).transaction(
+      (current) => (current || 0) + 1
     );
 
     logger.info(`Bet placed: ${userId} bet ${amount} on ${contestantId}`);
@@ -612,7 +593,7 @@ export const resolveChallenge = onCall<ResolveChallengeData>(
         volunteerData.balanceLocked,
         VOLUNTEER_MULTIPLIER
       );
-      
+
       const winner = await getParticipantData(sessionId, winnerId);
       await updateParticipant(sessionId, winnerId, {
         balance: winner.balance + volunteerReward,
@@ -704,6 +685,7 @@ export const resetSession = onCall<ResetSessionData>(
       volunteers: {},
       contestants: [],
       bets: {},
+      betCounts: {},
       odds: {},
       poolTotal: 0,
       winnerId: null,

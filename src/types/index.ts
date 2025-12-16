@@ -13,12 +13,12 @@ export type SessionStatus = 'OPEN' | 'VOLUNTEERING' | 'SELECTION' | 'BETTING' | 
 export type ChallengeStatus = 'PENDING' | 'VOLUNTEERING' | 'SELECTION' | 'BETTING' | 'IN_PROGRESS' | 'RESOLVED';
 
 // Transaction Types
-export type TransactionType = 
-  | 'INITIAL_GRANT' 
-  | 'BET_PLACED' 
-  | 'BET_WIN' 
-  | 'VOLUNTEER_LOCK' 
-  | 'VOLUNTEER_WIN' 
+export type TransactionType =
+  | 'INITIAL_GRANT'
+  | 'BET_PLACED'
+  | 'BET_WIN'
+  | 'VOLUNTEER_LOCK'
+  | 'VOLUNTEER_WIN'
   | 'VOLUNTEER_LOSS'
   | 'REFUND';
 
@@ -148,6 +148,7 @@ export interface GameState {
   contestants: string[];
   participants: Record<string, ParticipantRTDB>;
   bets: Record<string, number>;
+  betCounts: Record<string, number>;
   odds: Record<string, number>;
   poolTotal: number;
   winnerId?: string;
@@ -296,7 +297,7 @@ export interface ModalState {
 // TRANSLATION TYPES
 // ============================================
 
-export type TranslationKey = 
+export type TranslationKey =
   | 'Predicto'
   | 'Real-time Event Betting'
   | 'Loading...'

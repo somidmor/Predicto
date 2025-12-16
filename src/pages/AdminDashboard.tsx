@@ -15,10 +15,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { isSessionAdmin } from '../services/storageService';
 import {
   createChallenge,
-  startVolunteerPhase,
+
   closeVolunteering,
   selectContestants,
-  startBettingPhase,
+
   closeBetting,
   resolveChallenge,
   resetSession,
@@ -30,7 +30,7 @@ import {
   Play,
   Pause,
   Trophy,
-  Plus,
+
   Shuffle,
   CheckSquare,
   Loader2,
@@ -55,6 +55,8 @@ export function AdminDashboard() {
     volunteers,
     contestants,
     odds,
+    bets,
+    betCounts,
     poolTotal,
     participants,
     participantCount,
@@ -104,23 +106,14 @@ export function AdminDashboard() {
     try {
       await createChallenge(sessionId, newChallengeName.trim(), requiredParticipants);
       setNewChallengeName('');
+      // Don't reset loading on success - wait for status update to hide form
     } catch (err) {
       console.error('Failed to create challenge:', err);
+      setActionLoading(null);
     }
-    setActionLoading(null);
   };
 
-  const handleStartVolunteering = async (challengeId: string) => {
-    if (!sessionId) return;
 
-    setActionLoading('startVolunteering');
-    try {
-      await startVolunteerPhase(sessionId, challengeId);
-    } catch (err) {
-      console.error('Failed to start volunteering:', err);
-    }
-    setActionLoading(null);
-  };
 
   const handleCloseVolunteering = async () => {
     if (!sessionId) return;
@@ -152,17 +145,7 @@ export function AdminDashboard() {
     setActionLoading(null);
   };
 
-  const handleStartBetting = async () => {
-    if (!sessionId) return;
 
-    setActionLoading('startBetting');
-    try {
-      await startBettingPhase(sessionId);
-    } catch (err) {
-      console.error('Failed to start betting:', err);
-    }
-    setActionLoading(null);
-  };
 
   const handleCloseBetting = async () => {
     if (!sessionId) return;
@@ -305,11 +288,10 @@ export function AdminDashboard() {
             <div className="flex flex-wrap items-center gap-3 mt-4">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-primary-500/10 border border-primary-500/20 rounded-full">
                 <div
-                  className={`w-2 h-2 rounded-full ${
-                    status === 'RESOLVED'
-                      ? 'bg-green-500'
-                      : 'bg-primary-500 animate-pulse'
-                  }`}
+                  className={`w-2 h-2 rounded-full ${status === 'RESOLVED'
+                    ? 'bg-green-500'
+                    : 'bg-primary-500 animate-pulse'
+                    }`}
                 />
                 <span className="text-sm font-medium text-primary-400">
                   {status}
@@ -391,7 +373,10 @@ export function AdminDashboard() {
                       {actionLoading === 'createChallenge' ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
                       ) : (
-                        <Plus className="w-5 h-5" />
+                        <>
+                          <Play className="w-5 h-5" />
+                          <span>Create & Start</span>
+                        </>
                       )}
                     </motion.button>
                   </div>
@@ -412,23 +397,7 @@ export function AdminDashboard() {
                           {challenge.requiredParticipants} participants • {challenge.status}
                         </p>
                       </div>
-                      {status === 'OPEN' && challenge.status === 'PENDING' && (
-                        <motion.button
-                          onClick={() => handleStartVolunteering(challenge.id)}
-                          disabled={actionLoading === 'startVolunteering'}
-                          className="btn-primary flex items-center gap-2 text-sm py-2"
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          {actionLoading === 'startVolunteering' ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Play className="w-4 h-4" />
-                              <span>Start</span>
-                            </>
-                          )}
-                        </motion.button>
-                      )}
+                      {/* Start button removed as challenges auto-start */}
                     </div>
                   </div>
                 ))}
@@ -518,11 +487,10 @@ export function AdminDashboard() {
                     {volunteerList.map(([id, data]) => (
                       <motion.div
                         key={id}
-                        className={`p-3 rounded-xl border cursor-pointer transition-colors ${
-                          selectedVolunteers.includes(id)
-                            ? 'bg-primary-500/20 border-primary-500'
-                            : 'bg-surface-800/50 border-surface-700 hover:border-surface-500'
-                        }`}
+                        className={`p-3 rounded-xl border cursor-pointer transition-colors ${selectedVolunteers.includes(id)
+                          ? 'bg-primary-500/20 border-primary-500'
+                          : 'bg-surface-800/50 border-surface-700 hover:border-surface-500'
+                          }`}
                         onClick={() => toggleVolunteerSelection(id)}
                         whileTap={{ scale: 0.98 }}
                         initial={{ opacity: 0, x: -20 }}
@@ -531,11 +499,10 @@ export function AdminDashboard() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div
-                              className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                                selectedVolunteers.includes(id)
-                                  ? 'bg-primary-500 border-primary-500'
-                                  : 'border-surface-500'
-                              }`}
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedVolunteers.includes(id)
+                                ? 'bg-primary-500 border-primary-500'
+                                : 'border-surface-500'
+                                }`}
                             >
                               {selectedVolunteers.includes(id) && (
                                 <Check className="w-3 h-3 text-white" />
@@ -569,7 +536,7 @@ export function AdminDashboard() {
                       ) : (
                         <>
                           <CheckSquare className="w-5 h-5" />
-                          <span>Manual Select</span>
+                          <span>Select & Start</span>
                         </>
                       )}
                     </motion.button>
@@ -587,7 +554,7 @@ export function AdminDashboard() {
                       ) : (
                         <>
                           <Shuffle className="w-5 h-5" />
-                          <span>Random Select</span>
+                          <span>Random & Start</span>
                         </>
                       )}
                     </motion.button>
@@ -595,55 +562,6 @@ export function AdminDashboard() {
                 </>
               )}
 
-              {/* Contestants Selected - Ready to Start Betting (ONLY Start Betting button) */}
-              {status === 'SELECTION' && contestants.length >= 2 && (
-                <>
-                  <div className="space-y-3 mb-4">
-                    {contestants.map((id) => {
-                      const volunteer = volunteers[id];
-                      return (
-                        <motion.div
-                          key={id}
-                          className="p-4 bg-primary-500/10 rounded-xl border border-primary-500/30"
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
-                                <Trophy className="w-4 h-4 text-white" />
-                              </div>
-                              <span className="font-semibold">
-                                {volunteer?.firstName} {volunteer?.lastName}
-                              </span>
-                            </div>
-                            <span className="text-accent-400 font-bold">
-                              {formatNumber(volunteer?.balanceLocked || 0)} 🍎
-                            </span>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                  <motion.button
-                    onClick={handleStartBetting}
-                    disabled={actionLoading === 'startBetting'}
-                    className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-lg"
-                    whileTap={{ scale: 0.95 }}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    {actionLoading === 'startBetting' ? (
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                    ) : (
-                      <>
-                        <Play className="w-6 h-6" />
-                        <span>Start Betting Phase</span>
-                      </>
-                    )}
-                  </motion.button>
-                </>
-              )}
 
               {/* Betting Phase Controls */}
               {(status === 'BETTING' || status === 'IN_PROGRESS') && (
@@ -663,10 +581,20 @@ export function AdminDashboard() {
                               <h3 className="font-semibold">
                                 {volunteer?.firstName} {volunteer?.lastName}
                               </h3>
-                              <div className="flex items-center gap-2 mt-1">
+                              <div className="flex items-center gap-4 mt-1">
                                 <span className="odds-badge">
                                   {contestantOdds.toFixed(2)}x
                                 </span>
+                                <div className="text-sm text-surface-400 flex items-center gap-3">
+                                  <span className="flex items-center gap-1">
+                                    <Users className="w-3 h-3" />
+                                    {betCounts?.[id] || 0}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Coins className="w-3 h-3" />
+                                    {formatNumber(bets?.[id] || 0)}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                             {status === 'IN_PROGRESS' && (
@@ -769,8 +697,8 @@ export function AdminDashboard() {
               )}
             </motion.div>
           </div>
-        </div>
-      </div>
-    </Layout>
+        </div >
+      </div >
+    </Layout >
   );
 }
