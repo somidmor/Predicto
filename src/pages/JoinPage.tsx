@@ -4,15 +4,15 @@
 // ============================================
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Layout } from '../components/Layout';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSession } from '../contexts/SessionContext';
 import { joinSession, getSession, getParticipant } from '../services/firebaseService';
-import { 
-  getSessionUserIdentity, 
+import {
+  getSessionUserIdentity,
   isSessionAdmin,
   getUserId,
 } from '../services/storageService';
@@ -22,6 +22,9 @@ import { INITIAL_BALANCE } from '../types';
 export function JoinPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const forcePlayer = searchParams.get('forcePlayer') === 'true';
+
   const { isRTL, formatNumber, t } = useLanguage();
   const { lastProfile, setCurrentSessionId } = useAuth();
   const { setSessionId: setContextSessionId } = useSession();
@@ -49,7 +52,7 @@ export function JoinPage() {
 
       try {
         // Check if user is admin of this session
-        if (isSessionAdmin(sessionId)) {
+        if (isSessionAdmin(sessionId) && !forcePlayer) {
           navigate(`/admin/${sessionId}`);
           return;
         }
@@ -71,7 +74,7 @@ export function JoinPage() {
           // User has joined before - check their current state
           const userId = getUserId();
           const participant = await getParticipant(sessionId, userId);
-          
+
           if (participant) {
             setReturningPlayer({
               firstName: participant.firstName,
@@ -100,7 +103,7 @@ export function JoinPage() {
   // Handle returning player rejoining
   const handleReturningPlayerJoin = () => {
     if (!sessionId || !returningPlayer) return;
-    
+
     setCurrentSessionId(sessionId);
     setContextSessionId(sessionId);
     navigate(`/play/${sessionId}`);
@@ -203,11 +206,11 @@ export function JoinPage() {
               >
                 <RefreshCw className="w-8 h-8 text-accent-400" />
               </motion.div>
-              
+
               <h1 className="text-3xl font-display font-bold mb-2">
                 {t('common.success')}
               </h1>
-              
+
               <p className="text-surface-400">
                 {returningPlayer.firstName} {returningPlayer.lastName}
               </p>
@@ -292,9 +295,8 @@ export function JoinPage() {
               </label>
               <div className="relative">
                 <User
-                  className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500 ${
-                    isRTL ? 'right-4' : 'left-4'
-                  }`}
+                  className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500 ${isRTL ? 'right-4' : 'left-4'
+                    }`}
                 />
                 <input
                   type="text"
@@ -314,9 +316,8 @@ export function JoinPage() {
               </label>
               <div className="relative">
                 <User
-                  className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500 ${
-                    isRTL ? 'right-4' : 'left-4'
-                  }`}
+                  className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500 ${isRTL ? 'right-4' : 'left-4'
+                    }`}
                 />
                 <input
                   type="text"
@@ -336,9 +337,8 @@ export function JoinPage() {
               </label>
               <div className="relative">
                 <Calendar
-                  className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500 ${
-                    isRTL ? 'right-4' : 'left-4'
-                  }`}
+                  className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 text-surface-500 ${isRTL ? 'right-4' : 'left-4'
+                    }`}
                 />
                 <input
                   type="number"

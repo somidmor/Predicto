@@ -15,7 +15,17 @@ import { Leaderboard } from './pages/Leaderboard';
 import { ChallengeManager } from './pages/ChallengeManager';
 import './index.css';
 
+import { enableTestingMode } from './services/storageService';
+
 function App() {
+  // Check for testing mode immediately
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('forcePlayer') === 'true') {
+      enableTestingMode();
+    }
+  }
+
   return (
     <BrowserRouter>
       <LanguageProvider>

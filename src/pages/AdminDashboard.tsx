@@ -38,6 +38,9 @@ import {
   Shield,
   Sparkles,
   BarChart3,
+  UserPlus,
+  ExternalLink,
+  Share2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -93,6 +96,24 @@ export function AdminDashboard() {
       navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleShare = async () => {
+    if (navigator.share && sessionId) {
+      try {
+        await navigator.share({
+          title: 'Join PredictO Session',
+          text: `Join my PredictO session with code: ${sessionId}`,
+          url: `${window.location.origin}/join/${sessionId}`,
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+      }
+    } else {
+      // Fallback for browsers that don't support Web Share API
+      copyJoinLink(); // Copy link to clipboard
+      alert('Link copied to clipboard! You can share it manually.');
     }
   };
 
@@ -196,6 +217,25 @@ export function AdminDashboard() {
                   <span className="font-mono text-2xl font-bold tracking-widest">
                     {sessionId}
                   </span>
+                  <div className="flex items-center gap-2">
+                    <motion.button
+                      onClick={() => window.open(`/join/${sessionId}?forcePlayer=true`, '_blank')}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-surface-800 hover:bg-surface-700 rounded-full transition-colors text-sm text-surface-300 hover:text-primary-400 border border-surface-700"
+                      whileTap={{ scale: 0.95 }}
+                      title="Open new player tab for testing"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>Add Test Player</span>
+                    </motion.button>
+                    <motion.button
+                      onClick={handleShare}
+                      className="p-2 hover:bg-surface-800 rounded-full transition-colors"
+                      whileTap={{ scale: 0.9 }}
+                      title="Share Session Link"
+                    >
+                      <Share2 className="w-5 h-5 text-surface-400" />
+                    </motion.button>
+                  </div>
                   <motion.button
                     onClick={copySessionCode}
                     className="p-2 hover:bg-surface-700 rounded-lg transition-colors"

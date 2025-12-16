@@ -12,7 +12,31 @@ const STORAGE_KEYS = {
   LANGUAGE: 'predicto_language',
   CURRENT_SESSION: 'predicto_current_session',
   LAST_PROFILE: 'predicto_last_profile',
+  TEST_MODE: 'predicto_test_mode',
 } as const;
+
+// ============================================
+// Storage Helper (Local vs Session)
+// ============================================
+
+export function enableTestingMode(): void {
+  try {
+    sessionStorage.setItem(STORAGE_KEYS.TEST_MODE, 'true');
+  } catch (e) {
+    console.warn('Failed to enable testing mode:', e);
+  }
+}
+
+function getStorage(): Storage {
+  try {
+    if (sessionStorage.getItem(STORAGE_KEYS.TEST_MODE) === 'true') {
+      return sessionStorage;
+    }
+  } catch (e) {
+    // Ignore errors, fallback to localStorage
+  }
+  return localStorage;
+}
 
 // ============================================
 // UUID Generation
@@ -22,7 +46,7 @@ function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  
+
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -35,13 +59,14 @@ function generateUUID(): string {
 // ============================================
 
 export function getUserId(): string {
-  let userId = localStorage.getItem(STORAGE_KEYS.USER_ID);
-  
+  const storage = getStorage();
+  let userId = storage.getItem(STORAGE_KEYS.USER_ID);
+
   if (!userId) {
     userId = generateUUID();
-    localStorage.setItem(STORAGE_KEYS.USER_ID, userId);
+    storage.setItem(STORAGE_KEYS.USER_ID, userId);
   }
-  
+
   return userId;
 }
 
@@ -59,25 +84,25 @@ export function createAdminIdentity(sessionId: string, hostId: string): AdminIde
     hostId,
     createdAt: Date.now(),
   };
-  
+
   localStorage.setItem(
     `${STORAGE_KEYS.ADMIN_PREFIX}${sessionId}`,
     JSON.stringify(identity)
   );
-  
+
   // Set as current session
   setCurrentSession(sessionId);
-  
+
   return identity;
 }
 
 export function getAdminIdentity(sessionId: string): AdminIdentity | null {
-  const stored = localStorage.getItem(`${STORAGE_KEYS.ADMIN_PREFIX}${sessionId}`);
-  
+  const stored = getStorage().getItem(`${STORAGE_KEYS.ADMIN_PREFIX}${sessionId}`);
+
   if (!stored) {
     return null;
   }
-  
+
   try {
     return JSON.parse(stored) as AdminIdentity;
   } catch {
@@ -90,7 +115,7 @@ export function isSessionAdmin(sessionId: string): boolean {
 }
 
 export function clearAdminIdentity(sessionId: string): void {
-  localStorage.removeItem(`${STORAGE_KEYS.ADMIN_PREFIX}${sessionId}`);
+  getStorage().removeItem(`${STORAGE_KEYS.ADMIN_PREFIX}${sessionId}`);
 }
 
 // ============================================
@@ -117,26 +142,28 @@ export function setSessionUserIdentity(
     age,
     joinedAt: Date.now(),
   };
-  
-  localStorage.setItem(getSessionUserKey(sessionId), JSON.stringify(identity));
-  
-  // Also save as last profile for convenience
+
+  const storage = getStorage();
+  storage.setItem(getSessionUserKey(sessionId), JSON.stringify(identity));
+
+  // Also save as last profile for convenience (always in localStorage for persistence)
   localStorage.setItem(STORAGE_KEYS.LAST_PROFILE, JSON.stringify({ firstName, lastName, age }));
-  
+
   // Set as current session
   setCurrentSession(sessionId);
-  
+
   return identity;
 }
 
 export function getSessionUserIdentity(sessionId: string): SessionUserIdentity | null {
   const key = getSessionUserKey(sessionId);
-  const stored = localStorage.getItem(key);
-  
+  const storage = getStorage();
+  const stored = storage.getItem(key);
+
   if (!stored) {
     return null;
   }
-  
+
   try {
     return JSON.parse(stored) as SessionUserIdentity;
   } catch {
@@ -149,7 +176,7 @@ export function hasJoinedSession(sessionId: string): boolean {
 }
 
 export function clearSessionUserIdentity(sessionId: string): void {
-  localStorage.removeItem(getSessionUserKey(sessionId));
+  getStorage().removeItem(getSessionUserKey(sessionId));
 }
 
 // ============================================
@@ -191,11 +218,11 @@ export interface LastProfile {
 
 export function getLastProfile(): LastProfile | null {
   const stored = localStorage.getItem(STORAGE_KEYS.LAST_PROFILE);
-  
+
   if (!stored) {
     return null;
   }
-  
+
   try {
     const profile = JSON.parse(stored);
     if (profile.firstName && profile.lastName && profile.age) {
@@ -218,7 +245,7 @@ export function getLastProfile(): LastProfile | null {
 export function getCachedUserProfile(sessionId: string): CachedUserProfile | null {
   const identity = getSessionUserIdentity(sessionId);
   if (!identity) return null;
-  
+
   return {
     sessionId,
     userId: identity.userId,
@@ -238,8 +265,9 @@ export function updateCachedUserProfile(
   updates: Partial<CachedUserProfile>
 ): void {
   const key = `${STORAGE_KEYS.SESSION_USER_PREFIX}${sessionId}_profile`;
-  const stored = localStorage.getItem(key);
-  
+  const storage = getStorage();
+  const stored = storage.getItem(key);
+
   let profile: Partial<CachedUserProfile> = {};
   if (stored) {
     try {
@@ -248,8 +276,8 @@ export function updateCachedUserProfile(
       // Start fresh
     }
   }
-  
-  localStorage.setItem(key, JSON.stringify({ ...profile, ...updates, cachedAt: Date.now() }));
+
+  storage.setItem(key, JSON.stringify({ ...profile, ...updates, cachedAt: Date.now() }));
 }
 
 // ============================================
@@ -265,7 +293,7 @@ export function getLanguage(): Language {
 
 export function setLanguage(language: Language): void {
   localStorage.setItem(STORAGE_KEYS.LANGUAGE, language);
-  
+
   // Update document direction
   document.documentElement.dir = language === 'fa' ? 'rtl' : 'ltr';
   document.documentElement.lang = language;
@@ -277,14 +305,14 @@ export function setLanguage(language: Language): void {
 
 export function clearAllData(): void {
   const keysToRemove: string[] = [];
-  
+
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key?.startsWith('predicto_')) {
       keysToRemove.push(key);
     }
   }
-  
+
   keysToRemove.forEach((key) => localStorage.removeItem(key));
 }
 
@@ -294,7 +322,7 @@ export function clearAllData(): void {
 
 export function getAllJoinedSessions(): SessionUserIdentity[] {
   const sessions: SessionUserIdentity[] = [];
-  
+
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key?.startsWith(STORAGE_KEYS.SESSION_USER_PREFIX) && !key.includes('_profile')) {
@@ -308,6 +336,6 @@ export function getAllJoinedSessions(): SessionUserIdentity[] {
       }
     }
   }
-  
+
   return sessions.sort((a, b) => b.joinedAt - a.joinedAt);
 }

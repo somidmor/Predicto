@@ -50,7 +50,10 @@
 
   /* Gradient text */
   .gradient-text {
-    @apply bg-gradient-to-r from-primary-400 via-accent-300 to-secondary-400 bg-clip-text text-transparent;
+    background: linear-gradient(to right, #fb7185, #fcd34d, #4ade80);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
   /* Primary button - Pomegranate */
