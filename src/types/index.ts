@@ -148,7 +148,6 @@ export interface GameState {
   contestants: string[];
   participants: Record<string, ParticipantRTDB>;
   bets: Record<string, number>;
-  betCounts: Record<string, number>;
   odds: Record<string, number>;
   poolTotal: number;
   winnerId?: string;

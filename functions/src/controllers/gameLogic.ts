@@ -68,8 +68,21 @@ export const createChallenge = onCall<CreateChallengeData>(
     }
 
     const sessionData = sessionDoc.data();
-    if (sessionData?.status !== 'OPEN') {
-      throw new HttpsError('failed-precondition', 'Cannot create challenge: Session is not OPEN');
+    if (sessionData?.status !== 'OPEN' && sessionData?.status !== 'RESOLVED') {
+      throw new HttpsError('failed-precondition', 'Cannot create challenge: Session is not OPEN or RESOLVED');
+    }
+
+    // If RESOLVED, we need to reset participant flags first (Auto-Reset)
+    if (sessionData?.status === 'RESOLVED') {
+      const participantsSnapshot = await rtdb.ref(`sessions/${sessionId}/participants`).once('value');
+      const participants = participantsSnapshot.val() || {};
+      for (const participantId of Object.keys(participants)) {
+        await updateParticipant(sessionId, participantId, {
+          isVolunteer: false,
+          isContestant: false,
+          lockedBalance: 0,
+        });
+      }
     }
 
     if (!name || requiredParticipants < 2 || requiredParticipants > 10) {
@@ -112,7 +125,6 @@ export const createChallenge = onCall<CreateChallengeData>(
       poolTotal: 0,
       winnerId: null,
       bettingLocked: true,
-      betCounts: {},
     });
 
     logger.info(`Challenge ${challengeId} created and started for session ${sessionId}`);
@@ -133,7 +145,7 @@ interface StartVolunteerPhaseData {
 // DEPRECATED: Logic moved to createChallenge, but kept for backward compatibility if needed
 export const startVolunteerPhase = onCall<StartVolunteerPhaseData>(
   async (request): Promise<{ success: boolean }> => {
-    const { sessionId, challengeId } = request.data;
+    const { sessionId } = request.data;
     await validateSession(sessionId);
     // ... logic is now in createChallenge
     return { success: true };
@@ -245,6 +257,72 @@ export const volunteerForChallenge = onCall<VolunteerData>(
 );
 
 // ============================================
+// ADMIN: MAKE VOLUNTEER
+// ============================================
+
+interface AdminMakeVolunteerData {
+  sessionId: string;
+  userId: string;
+}
+
+export const adminMakeVolunteer = onCall<AdminMakeVolunteerData>(
+  async (request): Promise<VolunteerResult> => {
+    const { sessionId, userId } = request.data;
+
+    await validateSession(sessionId);
+
+    // Check game state
+    const gameStateSnapshot = await rtdb.ref(`sessions/${sessionId}`).once('value');
+    const gameState = gameStateSnapshot.val();
+
+    if (gameState?.status !== 'VOLUNTEERING') {
+      throw new HttpsError('failed-precondition', 'Not in volunteering phase');
+    }
+
+    // Get participant data
+    const participant = await getParticipantData(sessionId, userId);
+
+    if (participant.isVolunteer) {
+      throw new HttpsError('failed-precondition', 'Already volunteered');
+    }
+
+    if (participant.isContestant) {
+      throw new HttpsError('failed-precondition', 'Already a contestant');
+    }
+
+    // Lock 100% of balance (ALL-IN)
+    // If balance is 0, we can still make them volunteer? Maybe they have 0 balance but we want them in?
+    // The previous logic required balance > 0. Let's stick to that for now, or allow 0 if admin forces?
+    // Let's require balance > 0 to be safe for now, consistent with volunteerForChallenge.
+    if (participant.balance <= 0) {
+      throw new HttpsError('failed-precondition', 'Insufficient balance to volunteer');
+    }
+
+    const lockedAmount = participant.balance;
+
+    // Update participant
+    await updateParticipant(sessionId, userId, {
+      balance: 0,
+      lockedBalance: lockedAmount,
+      isVolunteer: true,
+    });
+
+    // Add to RTDB volunteers list
+    await rtdb.ref(`sessions/${sessionId}/volunteers/${userId}`).set({
+      userId,
+      firstName: participant.firstName,
+      lastName: participant.lastName,
+      balanceLocked: lockedAmount,
+      volunteeredAt: Date.now(),
+    });
+
+    logger.info(`Admin made user ${userId} a volunteer, locked ${lockedAmount}`);
+
+    return { success: true, lockedAmount };
+  }
+);
+
+// ============================================
 // SELECT CONTESTANTS
 // ============================================
 
@@ -336,13 +414,10 @@ export const selectContestants = onCall<SelectContestantsData>(
 
     // Initialize betting pools
     const initialBets: Record<string, number> = {};
-    const initialBetCounts: Record<string, number> = {};
     selected.forEach((id) => {
       initialBets[id] = 0;
-      initialBetCounts[id] = 0;
     });
     await rtdb.ref(`sessions/${sessionId}/bets`).set(initialBets);
-    await rtdb.ref(`sessions/${sessionId}/betCounts`).set(initialBetCounts);
 
     // AUTO-START BETTING PHASE
     // Update Firestore
@@ -369,6 +444,93 @@ export const selectContestants = onCall<SelectContestantsData>(
 );
 
 // ============================================
+// ADD CONTESTANT (Incremental)
+// ============================================
+
+interface AddContestantData {
+  sessionId: string;
+  userId?: string; // If missing, select random
+}
+
+export const addContestant = onCall<AddContestantData>(
+  async (request): Promise<{ success: boolean; userId: string }> => {
+    const { sessionId, userId } = request.data;
+
+    await validateSession(sessionId);
+
+    // Check game state
+    const gameStateSnapshot = await rtdb.ref(`sessions/${sessionId}`).once('value');
+    const gameState = gameStateSnapshot.val();
+
+    // Allow adding contestants in VOLUNTEERING or SELECTION phase
+    if (gameState?.status !== 'VOLUNTEERING' && gameState?.status !== 'SELECTION') {
+      throw new HttpsError('failed-precondition', 'Not in volunteering or selection phase');
+    }
+
+    // If in VOLUNTEERING, switch to SELECTION automatically?
+    // Or just allow it. Let's allow it.
+
+    const volunteers = gameState.volunteers || {};
+    const currentContestants = gameState.contestants || [];
+
+    let targetUserId = userId;
+
+    if (!targetUserId) {
+      // Random selection from volunteers who are NOT already contestants
+      const availableVolunteers = Object.keys(volunteers).filter(
+        (id) => !currentContestants.includes(id)
+      );
+
+      if (availableVolunteers.length === 0) {
+        throw new HttpsError('failed-precondition', 'No available volunteers');
+      }
+
+      const randomIndex = Math.floor(Math.random() * availableVolunteers.length);
+      targetUserId = availableVolunteers[randomIndex];
+    }
+
+    if (!volunteers[targetUserId]) {
+      throw new HttpsError('invalid-argument', 'User is not a volunteer');
+    }
+
+    if (currentContestants.includes(targetUserId)) {
+      throw new HttpsError('failed-precondition', 'User is already a contestant');
+    }
+
+    // Mark as contestant
+    await updateParticipant(sessionId, targetUserId, {
+      isContestant: true,
+    });
+
+    // Update RTDB contestants list
+    const newContestants = [...currentContestants, targetUserId];
+
+    // Initialize bet pool for this contestant
+    await rtdb.ref(`sessions/${sessionId}/bets/${targetUserId}`).transaction(
+      (current) => (current || 0)
+    );
+
+    await rtdb.ref(`sessions/${sessionId}`).update({
+      contestants: newContestants,
+      // If we were in VOLUNTEERING, maybe we should move to SELECTION?
+      // Let's enforce SELECTION status if we start picking contestants.
+      status: 'SELECTION',
+    });
+
+    // Ensure Firestore is also in SELECTION
+    if (gameState.status === 'VOLUNTEERING') {
+      await db.collection('sessions').doc(sessionId).update({
+        status: 'SELECTION',
+      });
+    }
+
+    logger.info(`Added contestant ${targetUserId}`);
+
+    return { success: true, userId: targetUserId };
+  }
+);
+
+// ============================================
 // START BETTING PHASE
 // ============================================
 
@@ -376,12 +538,60 @@ interface StartBettingPhaseData {
   sessionId: string;
 }
 
-// DEPRECATED: Logic moved to selectContestants
+// Logic restored and updated for manual flow
 export const startBettingPhase = onCall<StartBettingPhaseData>(
   async (request): Promise<{ success: boolean }> => {
     const { sessionId } = request.data;
     await validateSession(sessionId);
-    // ... logic is now in selectContestants
+
+    const gameStateSnapshot = await rtdb.ref(`sessions/${sessionId}`).once('value');
+    const gameState = gameStateSnapshot.val();
+
+    if (gameState?.status !== 'SELECTION') {
+      throw new HttpsError('failed-precondition', 'Not in selection phase');
+    }
+
+    const contestants = gameState.contestants || [];
+    if (contestants.length < 2) {
+      throw new HttpsError('failed-precondition', 'Need at least 2 contestants to start betting');
+    }
+
+    // Refund unselected volunteers
+    const volunteers = gameState.volunteers || {};
+    const volunteerIds = Object.keys(volunteers);
+    const unselected = volunteerIds.filter((id) => !contestants.includes(id));
+
+    for (const uid of unselected) {
+      const volunteerData = volunteers[uid];
+      await updateParticipant(sessionId, uid, {
+        balance: volunteerData.balanceLocked,
+        lockedBalance: 0,
+        isVolunteer: false,
+      });
+    }
+
+    // Initialize betting pools (if not already done incrementally)
+    const initialBets: Record<string, number> = {};
+    contestants.forEach((id: string) => {
+      initialBets[id] = 0;
+    });
+    // Merge with existing bets if any (addContestant initializes them)
+    // Actually, addContestant initializes them to 0. So we can just ensure they exist.
+    // But to be safe, let's just update the status.
+
+    // Update Firestore
+    await db.collection('sessions').doc(sessionId).update({
+      status: 'BETTING',
+    });
+
+    // Update RTDB
+    await rtdb.ref(`sessions/${sessionId}`).update({
+      status: 'BETTING',
+      bettingLocked: false,
+    });
+
+    logger.info(`Started betting phase with ${contestants.length} contestants. Refunded ${unselected.length} volunteers.`);
+
     return { success: true };
   }
 );
@@ -461,11 +671,6 @@ export const placeBet = onCall<PlaceBetData>(
       (current) => (current || 0) + amount
     );
 
-    // Update RTDB bet counts
-    await rtdb.ref(`sessions/${sessionId}/betCounts/${contestantId}`).transaction(
-      (current) => (current || 0) + 1
-    );
-
     logger.info(`Bet placed: ${userId} bet ${amount} on ${contestantId}`);
 
     return {
@@ -501,6 +706,118 @@ export const closeBetting = onCall<CloseBettingData>(
     });
 
     logger.info(`Betting closed for session ${sessionId}`);
+
+    return { success: true };
+  }
+);
+
+// ============================================
+// CANCEL CHALLENGE (Terminate)
+// ============================================
+
+interface CancelChallengeData {
+  sessionId: string;
+}
+
+export const cancelChallenge = onCall<CancelChallengeData>(
+  async (request): Promise<{ success: boolean }> => {
+    const { sessionId } = request.data;
+
+    await validateSession(sessionId);
+
+    // Get game state
+    const gameStateSnapshot = await rtdb.ref(`sessions/${sessionId}`).once('value');
+    const gameState = gameStateSnapshot.val() as GameState;
+
+    // Refund all pending bets
+    const pendingBetsSnapshot = await db
+      .collection('sessions')
+      .doc(sessionId)
+      .collection('bets')
+      .where('status', '==', 'PENDING')
+      .get();
+
+    for (const doc of pendingBetsSnapshot.docs) {
+      const betData = doc.data();
+      const participant = await getParticipantData(sessionId, betData.userId);
+      await updateParticipant(sessionId, betData.userId, {
+        balance: participant.balance + betData.amount,
+      });
+      await doc.ref.update({
+        status: 'CANCELLED',
+        payout: 0,
+        resolvedAt: Date.now(),
+      });
+    }
+
+    // Refund/Unlock all volunteers and contestants
+    const volunteers = gameState.volunteers || {};
+    const volunteerIds = Object.keys(volunteers);
+
+    for (const uid of volunteerIds) {
+      // const volunteerData = volunteers[uid];
+      // If they are still locked (balanceLocked > 0), refund them
+      // Note: contestants might have 0 lockedBalance if we cleared it? 
+      // No, contestants usually keep lockedBalance until resolution.
+      // But wait, in selectContestants we didn't clear lockedBalance for selected ones.
+      // So we can just restore balance from lockedBalance.
+
+      // However, we need to be careful. updateParticipant handles the logic.
+      // If we set lockedBalance to 0 and add to balance.
+
+      const participant = await getParticipantData(sessionId, uid);
+      // If they have locked balance, unlock it.
+      if (participant.lockedBalance > 0) {
+        await updateParticipant(sessionId, uid, {
+          balance: participant.balance + participant.lockedBalance,
+          lockedBalance: 0,
+          isVolunteer: false,
+          isContestant: false,
+        });
+      } else {
+        // Just clear flags
+        await updateParticipant(sessionId, uid, {
+          isVolunteer: false,
+          isContestant: false,
+        });
+      }
+    }
+
+    // Update Firestore
+    await db.collection('sessions').doc(sessionId).update({
+      status: 'OPEN',
+      currentChallengeId: null,
+    });
+
+    // If there was a current challenge, mark it as CANCELLED
+    const sessionDoc = await db.collection('sessions').doc(sessionId).get();
+    const sessionData = sessionDoc.data();
+    if (sessionData?.currentChallengeId) {
+      await db.collection('sessions').doc(sessionId).collection('challenges').doc(sessionData.currentChallengeId).update({
+        status: 'CANCELLED'
+      });
+    }
+
+    // Reset RTDB game state
+    const participantsSnapshot = await rtdb.ref(`sessions/${sessionId}/participants`).once('value');
+    const participants = participantsSnapshot.val() || {};
+    const participantCount = Object.keys(participants).length;
+
+    await rtdb.ref(`sessions/${sessionId}`).update({
+      status: 'OPEN',
+      challengeId: null,
+      challengeName: null,
+      volunteers: {},
+      contestants: [],
+      bets: {},
+      odds: {},
+      poolTotal: 0,
+      winnerId: null,
+      bettingLocked: true,
+      participantCount,
+    });
+
+    logger.info(`Session ${sessionId} challenge terminated/cancelled.`);
 
     return { success: true };
   }
@@ -685,7 +1002,6 @@ export const resetSession = onCall<ResetSessionData>(
       volunteers: {},
       contestants: [],
       bets: {},
-      betCounts: {},
       odds: {},
       poolTotal: 0,
       winnerId: null,

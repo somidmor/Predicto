@@ -48,10 +48,10 @@ export async function createSession(hostName?: string): Promise<{ sessionId: str
     'createSession',
     { hostName }
   );
-  
+
   // Store admin identity
   createAdminIdentity(response.sessionId, response.hostId);
-  
+
   return response;
 }
 
@@ -62,7 +62,7 @@ export async function joinSession(
   age: number
 ): Promise<JoinSessionResponse> {
   const userId = getUserId();
-  
+
   const response = await callFunction<JoinSessionRequest, JoinSessionResponse>('joinSession', {
     sessionId,
     userId,
@@ -70,22 +70,22 @@ export async function joinSession(
     lastName,
     age,
   });
-  
+
   // Store session user identity locally
   setSessionUserIdentity(sessionId, firstName, lastName, age);
   setCurrentSession(sessionId);
-  
+
   return response;
 }
 
 export async function getSession(sessionId: string): Promise<Session | null> {
   const docRef = doc(db, 'sessions', sessionId);
   const snapshot = await getDoc(docRef);
-  
+
   if (!snapshot.exists()) {
     return null;
   }
-  
+
   return { id: snapshot.id, ...snapshot.data() } as Session;
 }
 
@@ -142,8 +142,34 @@ export async function startVolunteerPhase(
 
 export async function volunteer(sessionId: string): Promise<VolunteerResponse> {
   const userId = getUserId();
-  
+
   return callFunction<VolunteerRequest, VolunteerResponse>('volunteerForChallenge', {
+    sessionId,
+    userId,
+  });
+}
+
+export async function adminMakeVolunteer(
+  sessionId: string,
+  userId: string
+): Promise<{ success: boolean; lockedAmount: number }> {
+  return callFunction<{
+    sessionId: string;
+    userId: string;
+  }, { success: boolean; lockedAmount: number }>('adminMakeVolunteer', {
+    sessionId,
+    userId,
+  });
+}
+
+export async function addContestant(
+  sessionId: string,
+  userId?: string
+): Promise<{ success: boolean; userId: string }> {
+  return callFunction<{
+    sessionId: string;
+    userId?: string;
+  }, { success: boolean; userId: string }>('addContestant', {
     sessionId,
     userId,
   });
@@ -198,7 +224,7 @@ export async function placeBet(
   amount: number
 ): Promise<PlaceBetResponse> {
   const userId = getUserId();
-  
+
   return callFunction<PlaceBetRequest, PlaceBetResponse>('placeBet', {
     sessionId,
     userId,
@@ -228,6 +254,12 @@ export async function resolveChallenge(
   });
 }
 
+export async function cancelChallenge(sessionId: string): Promise<{ success: boolean }> {
+  return callFunction<{ sessionId: string }, { success: boolean }>('cancelChallenge', {
+    sessionId,
+  });
+}
+
 export async function resetSession(sessionId: string): Promise<{ success: boolean }> {
   return callFunction<{ sessionId: string }, { success: boolean }>('resetSession', {
     sessionId,
@@ -243,7 +275,7 @@ export function subscribeToGameState(
   callback: (state: GameState | null) => void
 ): () => void {
   const gameStateRef = ref(rtdb, `sessions/${sessionId}`);
-  
+
   const listener = (snapshot: DataSnapshot) => {
     if (snapshot.exists()) {
       callback(snapshot.val() as GameState);
@@ -251,9 +283,9 @@ export function subscribeToGameState(
       callback(null);
     }
   };
-  
+
   onValue(gameStateRef, listener);
-  
+
   return () => off(gameStateRef, 'value', listener);
 }
 
@@ -262,13 +294,13 @@ export function subscribeToOdds(
   callback: (odds: Record<string, number>) => void
 ): () => void {
   const oddsRef = ref(rtdb, `sessions/${sessionId}/odds`);
-  
+
   const listener = (snapshot: DataSnapshot) => {
     callback(snapshot.val() || {});
   };
-  
+
   onValue(oddsRef, listener);
-  
+
   return () => off(oddsRef, 'value', listener);
 }
 
@@ -277,13 +309,13 @@ export function subscribeToVolunteers(
   callback: (volunteers: Record<string, { userId: string; firstName: string; lastName: string; balanceLocked: number; volunteeredAt: number }>) => void
 ): () => void {
   const volunteersRef = ref(rtdb, `sessions/${sessionId}/volunteers`);
-  
+
   const listener = (snapshot: DataSnapshot) => {
     callback(snapshot.val() || {});
   };
-  
+
   onValue(volunteersRef, listener);
-  
+
   return () => off(volunteersRef, 'value', listener);
 }
 
@@ -293,23 +325,23 @@ export function subscribeToBets(
 ): () => void {
   const betsRef = ref(rtdb, `sessions/${sessionId}/bets`);
   const poolRef = ref(rtdb, `sessions/${sessionId}/poolTotal`);
-  
+
   let currentBets: Record<string, number> = {};
   let currentPool = 0;
-  
+
   const betsListener = (snapshot: DataSnapshot) => {
     currentBets = snapshot.val() || {};
     callback(currentBets, currentPool);
   };
-  
+
   const poolListener = (snapshot: DataSnapshot) => {
     currentPool = snapshot.val() || 0;
     callback(currentBets, currentPool);
   };
-  
+
   onValue(betsRef, betsListener);
   onValue(poolRef, poolListener);
-  
+
   return () => {
     off(betsRef, 'value', betsListener);
     off(poolRef, 'value', poolListener);
@@ -322,23 +354,23 @@ export function subscribeToParticipants(
 ): () => void {
   const participantsRef = ref(rtdb, `sessions/${sessionId}/participants`);
   const countRef = ref(rtdb, `sessions/${sessionId}/participantCount`);
-  
+
   let currentParticipants: Record<string, ParticipantRTDB> = {};
   let currentCount = 0;
-  
+
   const participantsListener = (snapshot: DataSnapshot) => {
     currentParticipants = snapshot.val() || {};
     callback(currentParticipants, currentCount);
   };
-  
+
   const countListener = (snapshot: DataSnapshot) => {
     currentCount = snapshot.val() || 0;
     callback(currentParticipants, currentCount);
   };
-  
+
   onValue(participantsRef, participantsListener);
   onValue(countRef, countListener);
-  
+
   return () => {
     off(participantsRef, 'value', participantsListener);
     off(countRef, 'value', countListener);
@@ -351,7 +383,7 @@ export function subscribeToMyParticipantData(
   callback: (data: ParticipantRTDB | null) => void
 ): () => void {
   const myDataRef = ref(rtdb, `sessions/${sessionId}/participants/${userId}`);
-  
+
   const listener = (snapshot: DataSnapshot) => {
     if (snapshot.exists()) {
       callback(snapshot.val() as ParticipantRTDB);
@@ -359,9 +391,9 @@ export function subscribeToMyParticipantData(
       callback(null);
     }
   };
-  
+
   onValue(myDataRef, listener);
-  
+
   return () => off(myDataRef, 'value', listener);
 }
 
@@ -374,7 +406,7 @@ export function subscribeToSession(
   callback: (session: Session | null) => void
 ): Unsubscribe {
   const docRef = doc(db, 'sessions', sessionId);
-  
+
   return onSnapshot(
     docRef,
     (snapshot) => {
@@ -397,7 +429,7 @@ export function subscribeToChallenges(
 ): Unsubscribe {
   const challengesRef = collection(db, 'sessions', sessionId, 'challenges');
   const q = query(challengesRef, orderBy('createdAt', 'desc'));
-  
+
   return onSnapshot(
     q,
     (snapshot) => {
@@ -420,7 +452,7 @@ export function subscribeToParticipantFirestore(
   callback: (participant: Participant | null) => void
 ): Unsubscribe {
   const docRef = doc(db, 'sessions', sessionId, 'participants', participantUserId);
-  
+
   return onSnapshot(
     docRef,
     (snapshot) => {

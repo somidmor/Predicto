@@ -17,11 +17,14 @@ export {
   startVolunteerPhase,
   closeVolunteering,
   volunteerForChallenge,
+  adminMakeVolunteer,
   selectContestants,
+  addContestant,
   startBettingPhase,
   placeBet,
   closeBetting,
   resolveChallenge,
+  cancelChallenge,
   resetSession,
 } from './controllers/gameLogic';
 

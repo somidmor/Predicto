@@ -29,7 +29,6 @@ interface SessionContextType {
   contestants: string[];
   odds: Record<string, number>;
   bets: Record<string, number>;
-  betCounts: Record<string, number>;
   poolTotal: number;
   // Participants
   participants: Record<string, ParticipantRTDB>;
@@ -148,7 +147,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const contestants = gameState?.contestants || [];
   const odds = gameState?.odds || {};
   const bets = gameState?.bets || {};
-  const betCounts = gameState?.betCounts || {};
   const poolTotal = gameState?.poolTotal || 0;
   const timer = gameState?.timer || null;
   const status = gameState?.status || session?.status || 'OPEN';
@@ -169,7 +167,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         contestants,
         odds,
         bets,
-        betCounts,
         poolTotal,
         participants,
         participantCount,

@@ -16,8 +16,7 @@ import { isSessionAdmin } from '../services/storageService';
 import {
   createChallenge,
 
-  closeVolunteering,
-  selectContestants,
+
 
   closeBetting,
   resolveChallenge,
@@ -31,8 +30,7 @@ import {
   Pause,
   Trophy,
 
-  Shuffle,
-  CheckSquare,
+
   Loader2,
   QrCode,
   Coins,
@@ -55,8 +53,6 @@ export function AdminDashboard() {
     volunteers,
     contestants,
     odds,
-    bets,
-    betCounts,
     poolTotal,
     participants,
     participantCount,
@@ -67,7 +63,8 @@ export function AdminDashboard() {
   const [showQR, setShowQR] = useState(false);
   const [newChallengeName, setNewChallengeName] = useState('');
   const [requiredParticipants, setRequiredParticipants] = useState(2);
-  const [selectedVolunteers, setSelectedVolunteers] = useState<string[]>([]);
+
+
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Check admin access and set session context
@@ -104,9 +101,10 @@ export function AdminDashboard() {
 
     setActionLoading('createChallenge');
     try {
-      await createChallenge(sessionId, newChallengeName.trim(), requiredParticipants);
+      const { challengeId } = await createChallenge(sessionId, newChallengeName.trim(), requiredParticipants);
       setNewChallengeName('');
-      // Don't reset loading on success - wait for status update to hide form
+      // Navigate to challenge manager
+      navigate(`/admin/${sessionId}/challenge/${challengeId}`);
     } catch (err) {
       console.error('Failed to create challenge:', err);
       setActionLoading(null);
@@ -115,35 +113,7 @@ export function AdminDashboard() {
 
 
 
-  const handleCloseVolunteering = async () => {
-    if (!sessionId) return;
 
-    setActionLoading('closeVolunteering');
-    try {
-      await closeVolunteering(sessionId);
-    } catch (err) {
-      console.error('Failed to close volunteering:', err);
-    }
-    setActionLoading(null);
-  };
-
-  const handleSelectContestants = async (mode: 'MANUAL' | 'RANDOM') => {
-    if (!sessionId) return;
-
-    setActionLoading('selectContestants');
-    try {
-      await selectContestants(
-        sessionId,
-        mode,
-        mode === 'MANUAL' ? selectedVolunteers : undefined,
-        mode === 'RANDOM' ? requiredParticipants : undefined
-      );
-      setSelectedVolunteers([]);
-    } catch (err) {
-      console.error('Failed to select contestants:', err);
-    }
-    setActionLoading(null);
-  };
 
 
 
@@ -177,20 +147,13 @@ export function AdminDashboard() {
     setActionLoading('resetSession');
     try {
       await resetSession(sessionId);
-      setSelectedVolunteers([]);
     } catch (err) {
       console.error('Failed to reset session:', err);
     }
     setActionLoading(null);
   };
 
-  const toggleVolunteerSelection = (volunteerId: string) => {
-    setSelectedVolunteers((prev) =>
-      prev.includes(volunteerId)
-        ? prev.filter((id) => id !== volunteerId)
-        : [...prev, volunteerId]
-    );
-  };
+
 
   if (isLoading) {
     return (
@@ -202,7 +165,7 @@ export function AdminDashboard() {
     );
   }
 
-  const volunteerList = Object.entries(volunteers);
+
   const participantList = Object.entries(participants);
   const status = gameState?.status || 'OPEN';
 
@@ -337,7 +300,7 @@ export function AdminDashboard() {
               </h2>
 
               {/* Create Challenge Form */}
-              {status === 'OPEN' && (
+              {(status === 'OPEN' || status === 'RESOLVED') && (
                 <div className="space-y-3 mb-6 p-4 bg-surface-800/50 rounded-xl">
                   <input
                     type="text"
@@ -386,20 +349,25 @@ export function AdminDashboard() {
               {/* Challenge List */}
               <div className="space-y-3">
                 {challenges.map((challenge) => (
-                  <div
+                  <motion.div
                     key={challenge.id}
-                    className="p-4 bg-surface-800/50 rounded-xl border border-surface-700"
+                    onClick={() => navigate(`/admin/${sessionId}/challenge/${challenge.id}`)}
+                    className="p-4 bg-surface-800/50 rounded-xl border border-surface-700 cursor-pointer hover:border-primary-500/50 transition-colors group"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="font-semibold">{challenge.name}</h3>
+                        <h3 className="font-semibold group-hover:text-primary-400 transition-colors">{challenge.name}</h3>
                         <p className="text-sm text-surface-400">
                           {challenge.requiredParticipants} participants • {challenge.status}
                         </p>
                       </div>
-                      {/* Start button removed as challenges auto-start */}
+                      <div className="p-2 bg-surface-800 rounded-full group-hover:bg-primary-500/20 transition-colors">
+                        <Play className="w-4 h-4 text-surface-400 group-hover:text-primary-400" />
+                      </div>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
 
                 {challenges.length === 0 && (
@@ -410,295 +378,155 @@ export function AdminDashboard() {
               </div>
             </motion.div>
 
-            {/* Volunteer/Contestant Management */}
-            <motion.div
-              className="glass-card p-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <h2 className="text-xl font-display font-bold mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5 text-accent-400" />
-                {status === 'VOLUNTEERING' && contestants.length < 2 ? 'Volunteers' : 'Contestants'}
-              </h2>
+            {/* Volunteer/Contestant Management moved to ChallengeManager */}
+            {(status === 'VOLUNTEERING' || status === 'SELECTION') && (
+              <div className="glass-card p-6 flex flex-col items-center justify-center text-center">
+                <Shield className="w-12 h-12 text-primary-400 mb-4" />
+                <h3 className="text-xl font-bold mb-2">Challenge in Progress</h3>
+                <p className="text-surface-400 mb-6">
+                  Manage volunteers and contestants in the Challenge Manager.
+                </p>
+                <motion.button
+                  onClick={() => {
+                    const activeChallenge = challenges.find(c => c.status === 'VOLUNTEERING' || c.status === 'SELECTION');
+                    if (activeChallenge) {
+                      navigate(`/admin/${sessionId}/challenge/${activeChallenge.id}`);
+                    }
+                  }}
+                  className="btn-primary"
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Go to Challenge Manager
+                </motion.button>
+              </div>
+            )}
 
-              {/* VOLUNTEERING Phase - Players can volunteer, show "End Volunteer Period" button */}
-              {status === 'VOLUNTEERING' && (
-                <>
-                  {/* Volunteer List (read-only, no selection) */}
-                  <div className="space-y-2 mb-4">
-                    {volunteerList.map(([id, data]) => (
-                      <motion.div
+
+            {/* Betting Phase Controls */}
+            {(status === 'BETTING' || status === 'IN_PROGRESS') && (
+              <>
+                <div className="space-y-3 mb-4">
+                  {contestants.map((id) => {
+                    const volunteer = volunteers[id];
+                    const contestantOdds = odds[id] || 0;
+
+                    return (
+                      <div
                         key={id}
-                        className="p-3 rounded-xl border bg-surface-800/50 border-surface-700"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
+                        className="p-4 bg-surface-800/50 rounded-xl border border-surface-700"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-medium">
-                            {data.firstName} {data.lastName}
-                          </span>
-                          <span className="text-accent-400 font-bold">
-                            {formatNumber(data.balanceLocked)} 🍎
-                          </span>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {volunteerList.length === 0 && (
-                    <div className="text-center py-8">
-                      <Users className="w-12 h-12 text-surface-600 mx-auto mb-3" />
-                      <p className="text-surface-400">
-                        Waiting for volunteers...
-                      </p>
-                      <p className="text-sm text-surface-500 mt-1">
-                        Players can volunteer using the ALL-IN button
-                      </p>
-                    </div>
-                  )}
-
-                  {/* End Volunteer Period Button */}
-                  {volunteerList.length >= 2 && (
-                    <motion.button
-                      onClick={handleCloseVolunteering}
-                      disabled={actionLoading === 'closeVolunteering'}
-                      className="btn-secondary w-full flex items-center justify-center gap-2 py-3"
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      {actionLoading === 'closeVolunteering' ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          <Pause className="w-5 h-5" />
-                          <span>End Volunteer Period</span>
-                        </>
-                      )}
-                    </motion.button>
-                  )}
-                </>
-              )}
-
-              {/* SELECTION Phase - Volunteering closed, show selection buttons */}
-              {status === 'SELECTION' && contestants.length < 2 && (
-                <>
-                  {/* Volunteer List with selection checkboxes */}
-                  <div className="space-y-2 mb-4">
-                    {volunteerList.map(([id, data]) => (
-                      <motion.div
-                        key={id}
-                        className={`p-3 rounded-xl border cursor-pointer transition-colors ${selectedVolunteers.includes(id)
-                          ? 'bg-primary-500/20 border-primary-500'
-                          : 'bg-surface-800/50 border-surface-700 hover:border-surface-500'
-                          }`}
-                        onClick={() => toggleVolunteerSelection(id)}
-                        whileTap={{ scale: 0.98 }}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedVolunteers.includes(id)
-                                ? 'bg-primary-500 border-primary-500'
-                                : 'border-surface-500'
-                                }`}
+                          <div>
+                            <h3 className="font-semibold">
+                              {volunteer?.firstName} {volunteer?.lastName}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="odds-badge">
+                                {contestantOdds.toFixed(2)}x
+                              </span>
+                            </div>
+                          </div>
+                          {status === 'IN_PROGRESS' && (
+                            <motion.button
+                              onClick={() => handleDeclareWinner(id)}
+                              disabled={actionLoading === 'declareWinner'}
+                              className="btn-accent flex items-center gap-2"
+                              whileTap={{ scale: 0.95 }}
                             >
-                              {selectedVolunteers.includes(id) && (
-                                <Check className="w-3 h-3 text-white" />
-                              )}
-                            </div>
-                            <span className="font-medium">
-                              {data.firstName} {data.lastName}
-                            </span>
-                          </div>
-                          <span className="text-accent-400 font-bold">
-                            {formatNumber(data.balanceLocked)} 🍎
-                          </span>
+                              <Trophy className="w-4 h-4" />
+                              <span>Winner</span>
+                            </motion.button>
+                          )}
                         </div>
-                      </motion.div>
-                    ))}
-                  </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
-                  {/* Selection Buttons */}
-                  <div className="flex gap-3">
-                    <motion.button
-                      onClick={() => handleSelectContestants('MANUAL')}
-                      disabled={
-                        selectedVolunteers.length < 2 ||
-                        actionLoading === 'selectContestants'
-                      }
-                      className="btn-primary flex-1 flex items-center justify-center gap-2"
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      {actionLoading === 'selectContestants' ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          <CheckSquare className="w-5 h-5" />
-                          <span>Select & Start</span>
-                        </>
-                      )}
-                    </motion.button>
-                    <motion.button
-                      onClick={() => handleSelectContestants('RANDOM')}
-                      disabled={
-                        volunteerList.length < 2 ||
-                        actionLoading === 'selectContestants'
-                      }
-                      className="btn-secondary flex-1 flex items-center justify-center gap-2"
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      {actionLoading === 'selectContestants' ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          <Shuffle className="w-5 h-5" />
-                          <span>Random & Start</span>
-                        </>
-                      )}
-                    </motion.button>
-                  </div>
-                </>
-              )}
-
-
-              {/* Betting Phase Controls */}
-              {(status === 'BETTING' || status === 'IN_PROGRESS') && (
-                <>
-                  <div className="space-y-3 mb-4">
-                    {contestants.map((id) => {
-                      const volunteer = volunteers[id];
-                      const contestantOdds = odds[id] || 0;
-
-                      return (
-                        <div
-                          key={id}
-                          className="p-4 bg-surface-800/50 rounded-xl border border-surface-700"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-semibold">
-                                {volunteer?.firstName} {volunteer?.lastName}
-                              </h3>
-                              <div className="flex items-center gap-4 mt-1">
-                                <span className="odds-badge">
-                                  {contestantOdds.toFixed(2)}x
-                                </span>
-                                <div className="text-sm text-surface-400 flex items-center gap-3">
-                                  <span className="flex items-center gap-1">
-                                    <Users className="w-3 h-3" />
-                                    {betCounts?.[id] || 0}
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <Coins className="w-3 h-3" />
-                                    {formatNumber(bets?.[id] || 0)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            {status === 'IN_PROGRESS' && (
-                              <motion.button
-                                onClick={() => handleDeclareWinner(id)}
-                                disabled={actionLoading === 'declareWinner'}
-                                className="btn-accent flex items-center gap-2"
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                <Trophy className="w-4 h-4" />
-                                <span>Winner</span>
-                              </motion.button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {status === 'BETTING' && !gameState?.bettingLocked && (
-                    <motion.button
-                      onClick={handleCloseBetting}
-                      disabled={actionLoading === 'closeBetting'}
-                      className="btn-secondary w-full flex items-center justify-center gap-2"
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <Pause className="w-5 h-5" />
-                      <span>Close Betting</span>
-                    </motion.button>
-                  )}
-                </>
-              )}
-
-              {/* Resolved State */}
-              {status === 'RESOLVED' && gameState?.winnerId && (
-                <div className="text-center py-8">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                  >
-                    <Trophy className="w-16 h-16 text-accent-400 mx-auto mb-4" />
-                  </motion.div>
-                  <h3 className="text-2xl font-display font-bold mb-2">
-                    Winner! 🎉
-                  </h3>
-                  <p className="text-xl mb-6">
-                    {volunteers[gameState.winnerId]?.firstName}{' '}
-                    {volunteers[gameState.winnerId]?.lastName}
-                  </p>
-
+                {status === 'BETTING' && !gameState?.bettingLocked && (
                   <motion.button
-                    onClick={handleResetSession}
-                    disabled={actionLoading === 'resetSession'}
-                    className="btn-primary flex items-center justify-center gap-2 mx-auto"
+                    onClick={handleCloseBetting}
+                    disabled={actionLoading === 'closeBetting'}
+                    className="btn-secondary w-full flex items-center justify-center gap-2"
                     whileTap={{ scale: 0.95 }}
                   >
-                    {actionLoading === 'resetSession' ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <>
-                        <RotateCcw className="w-5 h-5" />
-                        <span>New Round</span>
-                      </>
-                    )}
+                    <Pause className="w-5 h-5" />
+                    <span>Close Betting</span>
                   </motion.button>
-                </div>
-              )}
+                )}
+              </>
+            )}
 
-              {/* Open State - Show Participants */}
-              {status === 'OPEN' && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium text-surface-400 mb-3 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Participants ({participantCount})
-                  </h3>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {participantList.map(([id, data]) => (
-                      <motion.div
-                        key={id}
-                        className="flex items-center justify-between p-2 bg-surface-800/30 rounded-lg"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                      >
-                        <span className="text-sm">
-                          {data.firstName} {data.lastName}
-                        </span>
-                        <span className="text-sm text-accent-400">
-                          {formatNumber(data.balance)} 🍎
-                        </span>
-                      </motion.div>
-                    ))}
-                    {participantList.length === 0 && (
-                      <p className="text-sm text-surface-500 text-center py-4">
-                        No players yet. Share the code!
-                      </p>
-                    )}
-                  </div>
+            {/* Resolved State */}
+            {status === 'RESOLVED' && gameState?.winnerId && (
+              <div className="text-center py-8">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                >
+                  <Trophy className="w-16 h-16 text-accent-400 mx-auto mb-4" />
+                </motion.div>
+                <h3 className="text-2xl font-display font-bold mb-2">
+                  Winner! 🎉
+                </h3>
+                <p className="text-xl mb-6">
+                  {volunteers[gameState.winnerId]?.firstName}{' '}
+                  {volunteers[gameState.winnerId]?.lastName}
+                </p>
+
+                <motion.button
+                  onClick={handleResetSession}
+                  disabled={actionLoading === 'resetSession'}
+                  className="btn-ghost flex items-center justify-center gap-2 mx-auto text-sm text-surface-400 hover:text-surface-300"
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {actionLoading === 'resetSession' ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Reset Session</span>
+                    </>
+                  )}
+                </motion.button>
+              </div>
+            )}
+
+            {/* Open State - Show Participants */}
+            {status === 'OPEN' && (
+              <div className="mt-4">
+                <h3 className="text-sm font-medium text-surface-400 mb-3 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Participants ({participantCount})
+                </h3>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {participantList.map(([id, data]) => (
+                    <motion.div
+                      key={id}
+                      className="flex items-center justify-between p-2 bg-surface-800/30 rounded-lg"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      <span className="text-sm">
+                        {data.firstName} {data.lastName}
+                      </span>
+                      <span className="text-sm text-accent-400">
+                        {formatNumber(data.balance)} 🍎
+                      </span>
+                    </motion.div>
+                  ))}
+                  {participantList.length === 0 && (
+                    <p className="text-sm text-surface-500 text-center py-4">
+                      No players yet. Share the code!
+                    </p>
+                  )}
                 </div>
-              )}
-            </motion.div>
+              </div>
+            )}
           </div>
-        </div >
-      </div >
-    </Layout >
+        </div>
+      </div>
+    </Layout>
   );
 }

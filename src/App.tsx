@@ -12,6 +12,7 @@ import { JoinPage } from './pages/JoinPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { PlayerView } from './pages/PlayerView';
 import { Leaderboard } from './pages/Leaderboard';
+import { ChallengeManager } from './pages/ChallengeManager';
 import './index.css';
 
 function App() {
@@ -22,24 +23,25 @@ function App() {
           <SessionProvider>
             <ToastProvider>
               <Routes>
-              {/* Home Page */}
-              <Route path="/" element={<HomePage />} />
-              
-              {/* Join Session */}
-              <Route path="/join/:sessionId" element={<JoinPage />} />
-              
-              {/* Admin Dashboard */}
-              <Route path="/admin/:sessionId" element={<AdminDashboard />} />
-              
-              {/* Player View */}
-              <Route path="/play/:sessionId" element={<PlayerView />} />
-              
-              {/* Leaderboard */}
-              <Route path="/leaderboard/:sessionId" element={<Leaderboard />} />
-              
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+                {/* Home Page */}
+                <Route path="/" element={<HomePage />} />
+
+                {/* Join Session */}
+                <Route path="/join/:sessionId" element={<JoinPage />} />
+
+                {/* Admin Dashboard */}
+                <Route path="/admin/:sessionId" element={<AdminDashboard />} />
+                <Route path="/admin/:sessionId/challenge/:challengeId" element={<ChallengeManager />} />
+
+                {/* Player View */}
+                <Route path="/play/:sessionId" element={<PlayerView />} />
+
+                {/* Leaderboard */}
+                <Route path="/leaderboard/:sessionId" element={<Leaderboard />} />
+
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
             </ToastProvider>
           </SessionProvider>
         </AuthProvider>
