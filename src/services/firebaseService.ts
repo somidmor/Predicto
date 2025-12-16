@@ -108,18 +108,24 @@ export async function createChallenge(
   sessionId: string,
   name: string,
   requiredParticipants: number,
-  description?: string
+  description?: string,
+  minAge?: number,
+  maxAge?: number
 ): Promise<{ challengeId: string }> {
   return callFunction<{
     sessionId: string;
     name: string;
     requiredParticipants: number;
     description?: string;
+    minAge?: number;
+    maxAge?: number;
   }, { challengeId: string }>('createChallenge', {
     sessionId,
     name,
     requiredParticipants,
     description,
+    minAge,
+    maxAge,
   });
 }
 

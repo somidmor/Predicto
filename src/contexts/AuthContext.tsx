@@ -41,6 +41,7 @@ interface AuthContextType {
   availableBalance: number;
   isVolunteer: boolean;
   isContestant: boolean;
+  age: number;
   // Loading state
   isLoading: boolean;
 }
@@ -102,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const availableBalance = balance;
   const isVolunteer = participantRTDB?.isVolunteer ?? participant?.isVolunteer ?? false;
   const isContestant = participantRTDB?.isContestant ?? participant?.isContestant ?? false;
+  const age = participant?.age ?? 0;
 
   const handleSetCurrentSessionId = useCallback((sessionId: string | null) => {
     setCurrentSessionId(sessionId);
@@ -127,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         availableBalance,
         isVolunteer,
         isContestant,
+        age,
         isLoading,
       }}
     >

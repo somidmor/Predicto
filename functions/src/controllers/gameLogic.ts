@@ -53,11 +53,13 @@ interface CreateChallengeData {
   name: string;
   requiredParticipants: number;
   description?: string;
+  minAge?: number;
+  maxAge?: number;
 }
 
 export const createChallenge = onCall<CreateChallengeData>(
   async (request): Promise<{ challengeId: string }> => {
-    const { sessionId, name, requiredParticipants, description } = request.data;
+    const { sessionId, name, requiredParticipants, description, minAge, maxAge } = request.data;
 
     // Validate session and check status
     const sessionRef = db.collection('sessions').doc(sessionId);
@@ -98,6 +100,8 @@ export const createChallenge = onCall<CreateChallengeData>(
       name,
       description,
       requiredParticipants,
+      minAge,
+      maxAge,
       status: 'VOLUNTEERING', // Auto-start to VOLUNTEERING
       contestants: [],
       createdAt: now,
@@ -118,6 +122,8 @@ export const createChallenge = onCall<CreateChallengeData>(
       challengeId,
       challengeName: name,
       requiredParticipants,
+      minAge,
+      maxAge,
       volunteers: {},
       contestants: [],
       bets: {},
@@ -231,6 +237,14 @@ export const volunteerForChallenge = onCall<VolunteerData>(
       throw new HttpsError('failed-precondition', 'Already volunteered');
     }
 
+    // Check Age Restrictions
+    if (gameState?.minAge && participant.age < gameState.minAge) {
+      throw new HttpsError('failed-precondition', `Minimum age is ${gameState.minAge}`);
+    }
+    if (gameState?.maxAge && participant.age > gameState.maxAge) {
+      throw new HttpsError('failed-precondition', `Maximum age is ${gameState.maxAge}`);
+    }
+
     // Lock 100% of balance (ALL-IN)
     const lockedAmount = participant.balance;
 
@@ -288,6 +302,14 @@ export const adminMakeVolunteer = onCall<AdminMakeVolunteerData>(
 
     if (participant.isContestant) {
       throw new HttpsError('failed-precondition', 'Already a contestant');
+    }
+
+    // Check Age Restrictions
+    if (gameState?.minAge && participant.age < gameState.minAge) {
+      throw new HttpsError('failed-precondition', `Minimum age is ${gameState.minAge}`);
+    }
+    if (gameState?.maxAge && participant.age > gameState.maxAge) {
+      throw new HttpsError('failed-precondition', `Maximum age is ${gameState.maxAge}`);
     }
 
     // Lock 100% of balance (ALL-IN)

@@ -66,6 +66,8 @@ export function AdminDashboard() {
   const [showQR, setShowQR] = useState(false);
   const [newChallengeName, setNewChallengeName] = useState('');
   const [requiredParticipants, setRequiredParticipants] = useState(2);
+  const [minAge, setMinAge] = useState<number | ''>('');
+  const [maxAge, setMaxAge] = useState<number | ''>('');
 
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -122,8 +124,17 @@ export function AdminDashboard() {
 
     setActionLoading('createChallenge');
     try {
-      const { challengeId } = await createChallenge(sessionId, newChallengeName.trim(), requiredParticipants);
+      const { challengeId } = await createChallenge(
+        sessionId,
+        newChallengeName.trim(),
+        requiredParticipants,
+        undefined, // description
+        minAge || undefined,
+        maxAge || undefined
+      );
       setNewChallengeName('');
+      setMinAge('');
+      setMaxAge('');
       // Navigate to challenge manager
       navigate(`/admin/${sessionId}/challenge/${challengeId}`);
     } catch (err) {
@@ -364,25 +375,43 @@ export function AdminDashboard() {
                         </option>
                       ))}
                     </select>
-                    <motion.button
-                      onClick={handleCreateChallenge}
-                      disabled={
-                        !newChallengeName.trim() ||
-                        actionLoading === 'createChallenge'
-                      }
-                      className="btn-primary flex items-center gap-2"
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      {actionLoading === 'createChallenge' ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          <Play className="w-5 h-5" />
-                          <span>Create & Start</span>
-                        </>
-                      )}
-                    </motion.button>
+                    <input
+                      type="number"
+                      placeholder="Min Age"
+                      value={minAge}
+                      onChange={(e) => setMinAge(e.target.value ? parseInt(e.target.value) : '')}
+                      className="input-field w-24"
+                      min="1"
+                      max="100"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max Age"
+                      value={maxAge}
+                      onChange={(e) => setMaxAge(e.target.value ? parseInt(e.target.value) : '')}
+                      className="input-field w-24"
+                      min="1"
+                      max="100"
+                    />
                   </div>
+                  <motion.button
+                    onClick={handleCreateChallenge}
+                    disabled={
+                      !newChallengeName.trim() ||
+                      actionLoading === 'createChallenge'
+                    }
+                    className="btn-primary w-full flex items-center justify-center gap-2"
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {actionLoading === 'createChallenge' ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Play className="w-5 h-5" />
+                        <span>Create & Start</span>
+                      </>
+                    )}
+                  </motion.button>
                 </div>
               )}
 

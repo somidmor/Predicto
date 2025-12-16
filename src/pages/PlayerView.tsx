@@ -41,6 +41,7 @@ export function PlayerView() {
     lockedBalance,
     isVolunteer,
     isContestant,
+    age,
     setCurrentSessionId,
     isLoading: authLoading,
   } = useAuth();
@@ -62,6 +63,12 @@ export function PlayerView() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showVolunteerModal, setShowVolunteerModal] = useState(false);
   const [showResult, setShowResult] = useState(false);
+  const [showCandidateSuccess, setShowCandidateSuccess] = useState(false);
+
+  // Check age eligibility
+  const minAge = gameState?.minAge;
+  const maxAge = gameState?.maxAge;
+  const isAgeEligible = (!minAge || age >= minAge) && (!maxAge || age <= maxAge);
 
   // Check if user has joined this session
   useEffect(() => {
@@ -103,6 +110,8 @@ export function PlayerView() {
     try {
       await volunteer(sessionId);
       setShowVolunteerModal(false);
+      setShowCandidateSuccess(true);
+      setTimeout(() => setShowCandidateSuccess(false), 3000);
     } catch (err) {
       console.error('Failed to volunteer:', err);
     }
@@ -183,18 +192,16 @@ export function PlayerView() {
             {/* Status Badges */}
             <div className="flex flex-wrap items-center gap-3 mt-4">
               <div
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
-                  status === 'RESOLVED'
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${status === 'RESOLVED'
                     ? 'bg-green-500/10 border border-green-500/30 text-green-400'
                     : 'bg-accent-500/10 border border-accent-500/20 text-accent-400'
-                }`}
+                  }`}
               >
                 <div
-                  className={`w-2 h-2 rounded-full ${
-                    status === 'RESOLVED'
+                  className={`w-2 h-2 rounded-full ${status === 'RESOLVED'
                       ? 'bg-green-500'
                       : 'bg-accent-500 animate-pulse'
-                  }`}
+                    }`}
                 />
                 <span className="text-sm font-medium">{status}</span>
               </div>
@@ -244,6 +251,35 @@ export function PlayerView() {
             </motion.div>
           )}
 
+          {/* Contestant VS Display (Visible to everyone during SELECTION/BETTING) */}
+          {(status === 'SELECTION' || status === 'BETTING' || status === 'IN_PROGRESS') && contestants.length >= 2 && (
+            <motion.div
+              className="glass-card p-4 mb-6"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+            >
+              <h3 className="text-center text-surface-400 text-sm mb-4 uppercase tracking-widest font-bold">Current Matchup</h3>
+              <div className="flex items-center justify-center gap-4">
+                {contestants.map((id, index) => {
+                  const v = volunteers[id];
+                  return (
+                    <div key={id} className="flex items-center">
+                      <div className="text-center">
+                        <div className="w-16 h-16 rounded-full bg-surface-800 border-2 border-primary-500 flex items-center justify-center mx-auto mb-2 text-2xl font-bold text-primary-400">
+                          {v?.firstName?.charAt(0)}
+                        </div>
+                        <p className="font-bold text-sm">{v?.firstName}</p>
+                      </div>
+                      {index < contestants.length - 1 && (
+                        <div className="mx-4 text-2xl font-display font-bold text-accent-500 italic">VS</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
           {/* Volunteering Phase */}
           {status === 'VOLUNTEERING' && !isVolunteer && balance > 0 && (
             <motion.div
@@ -253,8 +289,8 @@ export function PlayerView() {
               transition={{ delay: 0.1 }}
             >
               <h2 className="text-xl font-display font-bold mb-2 flex items-center gap-2">
-                 <Moon className="w-6 h-6 text-accent-400" />
-                 {t('volunteer.title')}
+                <Moon className="w-6 h-6 text-accent-400" />
+                {t('volunteer.title')}
               </h2>
               <p className="text-surface-400 mb-4">{t('volunteer.description')}</p>
 
@@ -270,14 +306,28 @@ export function PlayerView() {
                 </div>
               </div>
 
+              {!isAgeEligible && (
+                <div className="p-4 bg-surface-800 rounded-xl mb-4 border border-surface-700 flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-surface-400" />
+                  <p className="text-surface-400 text-sm">
+                    Age Restriction: {minAge || 'Any'} - {maxAge || 'Any'} years old.
+                    (You are {age})
+                  </p>
+                </div>
+              )}
+
               <motion.button
                 onClick={() => setShowVolunteerModal(true)}
-                className="btn-primary w-full flex items-center justify-center gap-2"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                disabled={!isAgeEligible}
+                className={`w-full flex items-center justify-center gap-2 p-4 rounded-xl font-bold transition-all ${isAgeEligible
+                    ? 'bg-primary-500 hover:bg-primary-600 text-white shadow-lg shadow-primary-500/20'
+                    : 'bg-surface-700 text-surface-400 cursor-not-allowed'
+                  }`}
+                whileHover={isAgeEligible ? { scale: 1.02 } : {}}
+                whileTap={isAgeEligible ? { scale: 0.98 } : {}}
               >
                 <Sparkles className="w-5 h-5" />
-                <span>{t('volunteer.button')}</span>
+                <span>Become a Candidate</span>
               </motion.button>
             </motion.div>
           )}
@@ -291,8 +341,9 @@ export function PlayerView() {
             >
               <Loader2 className="w-12 h-12 text-accent-500 animate-spin mx-auto mb-4" />
               <h2 className="text-xl font-display font-bold mb-2">
-                {status === 'SELECTION' ? t('volunteer.waiting') : t('volunteer.waiting')}
+                You are a candidate!
               </h2>
+              <p className="text-surface-400 mb-2">Waiting for selection...</p>
               <p className="text-surface-400">
                 {formatCurrency(volunteerData?.balanceLocked || lockedBalance)} {t('player.locked')}
               </p>
@@ -325,7 +376,7 @@ export function PlayerView() {
             >
               <Star className="w-16 h-16 text-primary-400 mx-auto mb-4 animate-pulse" />
               <h2 className="text-2xl font-display font-bold mb-2">
-                {t('volunteer.selected')}
+                You are one of the volunteers, good luck!
               </h2>
               <p className="text-surface-400">
                 {t('player.locked')}: {formatCurrency(lockedBalance)}
@@ -569,6 +620,28 @@ export function PlayerView() {
                   )}
                 </motion.button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Candidate Success Animation */}
+      <AnimatePresence>
+        {showCandidateSuccess && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-accent-500 text-white px-8 py-4 rounded-full shadow-xl flex items-center gap-3"
+              initial={{ y: 50, scale: 0.5 }}
+              animate={{ y: 0, scale: 1 }}
+              exit={{ y: -50, opacity: 0 }}
+            >
+              <Sparkles className="w-6 h-6 animate-spin" />
+              <span className="text-lg font-bold">You are a candidate! Good luck!</span>
             </motion.div>
           </motion.div>
         )}

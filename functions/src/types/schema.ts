@@ -31,6 +31,8 @@ export interface Challenge {
   name: string;
   description?: string;
   requiredParticipants: number;
+  minAge?: number;
+  maxAge?: number;
   status: ChallengeStatus;
   contestants: string[];
   winnerId?: string;

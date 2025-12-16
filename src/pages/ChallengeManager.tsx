@@ -35,6 +35,7 @@ export function ChallengeManager() {
         volunteers,
         contestants,
         participants,
+        gameState,
         isLoading,
     } = useSession();
 
@@ -115,9 +116,9 @@ export function ChallengeManager() {
     const currentContestants = contestants || [];
 
     // Filter participants who are NOT volunteers and NOT contestants
-    const eligibleParticipants = participantList.filter(([id, p]) =>
-        !volunteers[id] && !currentContestants.includes(id) && p.balance > 0
-    );
+    const eligibleParticipants = participantList
+        .filter(([id, p]) => !volunteers[id] && !currentContestants.includes(id) && p.balance > 0)
+        .sort(([, a], [, b]) => a.age - b.age); // Sort by age ascending
 
     // Filter volunteers who are NOT contestants
     const eligibleVolunteers = volunteerList.filter(([id]) =>
@@ -145,6 +146,12 @@ export function ChallengeManager() {
                                     Challenge Manager
                                 </h1>
                                 <p className="text-surface-400">Manage volunteers and contestants</p>
+                                {gameState?.minAge || gameState?.maxAge ? (
+                                    <div className="flex items-center gap-2 mt-1 text-sm text-accent-400">
+                                        <AlertTriangle className="w-4 h-4" />
+                                        <span>Age Restriction: {gameState.minAge || 'Any'} - {gameState.maxAge || 'Any'}</span>
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
 
@@ -182,7 +189,7 @@ export function ChallengeManager() {
                                 {eligibleParticipants.map(([id, p]) => (
                                     <div key={id} className="p-3 bg-surface-800/50 rounded-xl border border-surface-700 flex items-center justify-between">
                                         <div>
-                                            <p className="font-medium">{p.firstName} {p.lastName}</p>
+                                            <p className="font-medium">{p.firstName} {p.lastName} <span className="text-surface-400 text-sm">({p.age}yo)</span></p>
                                             <p className="text-sm text-accent-400">{formatNumber(p.balance)} 🍎</p>
                                         </div>
                                         <motion.button

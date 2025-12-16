@@ -103,6 +103,8 @@ export interface Challenge {
   name: string;
   description?: string;
   requiredParticipants: number;
+  minAge?: number;
+  maxAge?: number;
   status: ChallengeStatus;
   contestants: string[];
   winnerId?: string;
@@ -130,6 +132,7 @@ export interface ParticipantRTDB {
   isVolunteer: boolean;
   isContestant: boolean;
   joinedAt: number;
+  age: number;
 }
 
 export interface TimerState {
@@ -143,6 +146,8 @@ export interface GameState {
   challengeId?: string;
   challengeName?: string;
   requiredParticipants?: number;
+  minAge?: number;
+  maxAge?: number;
   timer: TimerState | null;
   volunteers: Record<string, VolunteerData>;
   contestants: string[];
