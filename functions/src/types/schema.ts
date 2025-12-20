@@ -109,13 +109,25 @@ export interface Bet {
   resolvedAt?: number;
 }
 
+export interface ParticipantRTDB {
+  firstName: string;
+  lastName: string;
+  balance: number;
+  lockedBalance: number;
+  isVolunteer: boolean;
+  isContestant: boolean;
+  joinedAt: number;
+  age: number;
+  bets?: Record<string, number>;
+}
+
 // ============================================
 // CONSTANTS
 // ============================================
 
-export const INITIAL_BALANCE = 100;
+export const INITIAL_BALANCE = 1000;
 export const MIN_BET_AMOUNT = 1;
-export const VOLUNTEER_MULTIPLIER = 3;
+export const VOLUNTEER_MULTIPLIER = 2;
 export const DEFAULT_BETTING_DURATION = 60;
 export const MIN_CONTESTANTS = 2;
 export const MAX_CONTESTANTS = 10;

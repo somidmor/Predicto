@@ -39,7 +39,6 @@ import {
   Sparkles,
   BarChart3,
   UserPlus,
-  ExternalLink,
   Share2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';

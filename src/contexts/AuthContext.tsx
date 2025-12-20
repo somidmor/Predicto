@@ -42,6 +42,7 @@ interface AuthContextType {
   isVolunteer: boolean;
   isContestant: boolean;
   age: number;
+  myBets: Record<string, number>;
   // Loading state
   isLoading: boolean;
 }
@@ -130,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isVolunteer,
         isContestant,
         age,
+        myBets: participantRTDB?.bets || {},
         isLoading,
       }}
     >

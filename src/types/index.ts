@@ -133,6 +133,7 @@ export interface ParticipantRTDB {
   isContestant: boolean;
   joinedAt: number;
   age: number;
+  bets?: Record<string, number>;
 }
 
 export interface TimerState {
@@ -524,9 +525,9 @@ export type TranslationKey =
 // CONSTANTS
 // ============================================
 
-export const INITIAL_BALANCE = 100;
+export const INITIAL_BALANCE = 1000;
 export const MIN_BET_AMOUNT = 1;
-export const VOLUNTEER_MULTIPLIER = 3; // Winner gets 3x their locked balance
+export const VOLUNTEER_MULTIPLIER = 2; // Winner gets 2x their locked balance
 export const DEFAULT_BETTING_DURATION = 60; // seconds
 export const MIN_CONTESTANTS = 2;
 export const MAX_CONTESTANTS = 10;

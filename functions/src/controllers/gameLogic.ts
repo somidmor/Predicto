@@ -10,6 +10,7 @@ import { validateSession, getParticipantData } from './session';
 import { calculatePariMutuelOdds, calculateVolunteerReward } from '../math/pariMutuel';
 import {
   Participant,
+  ParticipantRTDB,
   GameState,
   Challenge,
   VOLUNTEER_MULTIPLIER,
@@ -640,7 +641,8 @@ export const placeBet = onCall<PlaceBetData>(
   async (request): Promise<PlaceBetResult> => {
     const { sessionId, userId, contestantId, amount } = request.data;
 
-    if (!sessionId || !userId || !contestantId || amount <= 0) {
+    // Validate inputs
+    if (!sessionId || !userId || !contestantId || amount < 0) { // Allow 0 to remove bet? No, let's keep it simple for now > 0
       throw new HttpsError('invalid-argument', 'Invalid bet parameters');
     }
 
@@ -660,15 +662,38 @@ export const placeBet = onCall<PlaceBetData>(
       throw new HttpsError('failed-precondition', 'Contestants cannot bet');
     }
 
-    // Get participant
+    // Get bet status (current bets for this user)
+    // We need to know if they already bet on this contestant to calculate difference
+    const participantRef = rtdb.ref(`sessions/${sessionId}/participants/${userId}`);
+    const participantSnapshot = await participantRef.once('value');
+    const participantRTDB = participantSnapshot.val() as ParticipantRTDB; // Using RTDB for quick check
+
+    // Get Firestore participant for secure balance source of truth
     const participant = await getParticipantData(sessionId, userId);
 
-    if (participant.balance < amount) {
+    // Calculate difference
+    const currentBetAmount = participantRTDB?.bets?.[contestantId] || 0;
+    const difference = amount - currentBetAmount;
+
+    // Logic:
+    // If difference > 0 (Increasing bet): Need (balance >= difference)
+    // If difference < 0 (Decreasing bet): Refund (balance += abs(difference))
+    // If difference == 0: No op
+
+    if (difference === 0) {
+      return {
+        success: true,
+        betId: 'no-change',
+        oddsAtPlacement: gameState.odds[contestantId] || 1,
+        newBalance: participant.balance,
+      };
+    }
+
+    if (difference > 0 && participant.balance < difference) {
       throw new HttpsError('failed-precondition', 'Insufficient balance');
     }
 
-    const betId = db.collection('sessions').doc(sessionId).collection('bets').doc().id;
-    const newBalance = participant.balance - amount;
+    const newBalance = participant.balance - difference;
     const currentOdds = gameState.odds[contestantId] || 1;
 
     // Update participant balance
@@ -676,28 +701,51 @@ export const placeBet = onCall<PlaceBetData>(
       balance: newBalance,
     });
 
-    // Record bet
-    await db.collection('sessions').doc(sessionId).collection('bets').doc(betId).set({
-      id: betId,
+    // Update User's Personal Bet in RTDB (Sync for frontend)
+    await rtdb.ref(`sessions/${sessionId}/participants/${userId}/bets/${contestantId}`).set(amount);
+
+    // Record Transaction / Bet Document
+    // Note: We create a NEW bet document for the RECORD, but logically it's an update.
+    // Or we can overwrite a single bet document per contestant?
+    // For now, let's keep a history of "moves" (transactions) but the "state" is in RTDB.
+    // Actually, resolveChallenge uses Firestore 'bets' collection.
+    // We should probably UPSERT in Firestore too to avoid double counting if resolve iterates all docs.
+    // IMPORTANT: resolveChallenge sums up all bets?
+    // Let's check resolveChallenge implementation later. For now, let's store the LATEST amount in a unique doc per user-contestant couple?
+    // Or simpler: Just log this action as a transaction.
+    // But wait, if resolveChallenge iterates ALL bet docs, and I have 2 docs (one for 10, one for +20), it sums to 30.
+    // That works for additive. But if I DECREASE (one for 10, one for -5), I need to support negative amounts in bet docs?
+    // BETTER APPROACH: Use a deterministic ID for the bet doc: `${userId}_${contestantId}`
+    // This allows exact overwriting (UPSERT).
+
+    const deterministicBetId = `${userId}_${contestantId}`;
+    await db.collection('sessions').doc(sessionId).collection('bets').doc(deterministicBetId).set({
+      id: deterministicBetId,
       userId,
       sessionId,
       contestantId,
-      amount,
-      oddsAtPlacement: currentOdds,
+      amount: amount, // The NEW total amount
+      oddsAtPlacement: currentOdds, // Updates odds if they changed? Or keep original? Standard sports betting locks odds.
+      // But this is Pari-Mutuel / Dynamic pool. Odds are final only at end.
+      // So oddsAtPlacement is just informational here.
       status: 'PENDING',
       placedAt: Date.now(),
+      lastUpdatedAt: Date.now(),
     });
 
-    // Update RTDB pool
+    // Update Global Pool (RTDB)
+    // We update by the DIFFERENCE
     await rtdb.ref(`sessions/${sessionId}/bets/${contestantId}`).transaction(
-      (current) => (current || 0) + amount
+      (current) => (current || 0) + difference
     );
+    
+    // Also update total pool? Usually implicit sum.
 
-    logger.info(`Bet placed: ${userId} bet ${amount} on ${contestantId}`);
+    logger.info(`Bet updated: ${userId} on ${contestantId} from ${currentBetAmount} to ${amount} (diff: ${difference})`);
 
     return {
       success: true,
-      betId,
+      betId: deterministicBetId,
       oddsAtPlacement: currentOdds,
       newBalance,
     };
@@ -766,7 +814,7 @@ export const cancelChallenge = onCall<CancelChallengeData>(
         balance: participant.balance + betData.amount,
       });
       await doc.ref.update({
-        status: 'CANCELLED',
+        status: 'REFUNDED', // Better semantic than CANCELLED for hard delete context
         payout: 0,
         resolvedAt: Date.now(),
       });
@@ -777,16 +825,6 @@ export const cancelChallenge = onCall<CancelChallengeData>(
     const volunteerIds = Object.keys(volunteers);
 
     for (const uid of volunteerIds) {
-      // const volunteerData = volunteers[uid];
-      // If they are still locked (balanceLocked > 0), refund them
-      // Note: contestants might have 0 lockedBalance if we cleared it? 
-      // No, contestants usually keep lockedBalance until resolution.
-      // But wait, in selectContestants we didn't clear lockedBalance for selected ones.
-      // So we can just restore balance from lockedBalance.
-
-      // However, we need to be careful. updateParticipant handles the logic.
-      // If we set lockedBalance to 0 and add to balance.
-
       const participant = await getParticipantData(sessionId, uid);
       // If they have locked balance, unlock it.
       if (participant.lockedBalance > 0) {
@@ -805,19 +843,25 @@ export const cancelChallenge = onCall<CancelChallengeData>(
       }
     }
 
-    // Update Firestore
+    // Get current challenge ID BEFORE clearing it
+    const sessionDoc = await db.collection('sessions').doc(sessionId).get();
+    const sessionData = sessionDoc.data();
+    const challengeIdToDelete = sessionData?.currentChallengeId || gameState?.challengeId;
+
+    // Update Firestore Session State
     await db.collection('sessions').doc(sessionId).update({
       status: 'OPEN',
       currentChallengeId: null,
     });
 
-    // If there was a current challenge, mark it as CANCELLED
-    const sessionDoc = await db.collection('sessions').doc(sessionId).get();
-    const sessionData = sessionDoc.data();
-    if (sessionData?.currentChallengeId) {
-      await db.collection('sessions').doc(sessionId).collection('challenges').doc(sessionData.currentChallengeId).update({
-        status: 'CANCELLED'
-      });
+    // HARD DELETE: Delete the challenge document
+    if (challengeIdToDelete) {
+      const challengeRef = db.collection('sessions').doc(sessionId).collection('challenges').doc(challengeIdToDelete);
+      const challengeDoc = await challengeRef.get();
+      if (challengeDoc.exists) {
+        await challengeRef.delete();
+        logger.info(`HARD DELETED challenge ${challengeIdToDelete}`);
+      }
     }
 
     // Reset RTDB game state
@@ -829,6 +873,9 @@ export const cancelChallenge = onCall<CancelChallengeData>(
       status: 'OPEN',
       challengeId: null,
       challengeName: null,
+      requiredParticipants: null,
+      minAge: null,
+      maxAge: null,
       volunteers: {},
       contestants: [],
       bets: {},
@@ -839,7 +886,7 @@ export const cancelChallenge = onCall<CancelChallengeData>(
       participantCount,
     });
 
-    logger.info(`Session ${sessionId} challenge terminated/cancelled.`);
+    logger.info(`Session ${sessionId} reset. Challenge hard deleted.`);
 
     return { success: true };
   }

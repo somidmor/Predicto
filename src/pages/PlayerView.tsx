@@ -42,6 +42,7 @@ export function PlayerView() {
     isVolunteer,
     isContestant,
     age,
+    myBets,
     setCurrentSessionId,
     isLoading: authLoading,
   } = useAuth();
@@ -51,11 +52,13 @@ export function PlayerView() {
     volunteers,
     contestants,
     odds,
+    bets,
     poolTotal,
     participantCount,
     challengeName,
     status,
     winnerId,
+    challenges,
     isLoading: sessionLoading,
   } = useSession();
 
@@ -66,8 +69,14 @@ export function PlayerView() {
   const [showCandidateSuccess, setShowCandidateSuccess] = useState(false);
 
   // Check age eligibility
-  const minAge = gameState?.minAge;
-  const maxAge = gameState?.maxAge;
+  // Check age eligibility
+  // Fallback to active challenge from Firestore if GameState (RTDB) is syncing
+  const activeChallenge = challenges.find((c) => c.status === 'VOLUNTEERING' || c.status === 'SELECTION') || 
+                          (gameState?.challengeId ? challenges.find(c => c.id === gameState.challengeId) : undefined);
+                          
+  const minAge = gameState?.minAge ?? activeChallenge?.minAge;
+  const maxAge = gameState?.maxAge ?? activeChallenge?.maxAge;
+  
   const isAgeEligible = (!minAge || age >= minAge) && (!maxAge || age <= maxAge);
 
   // Check if user has joined this session
@@ -122,12 +131,19 @@ export function PlayerView() {
     if (!sessionId) return;
 
     const amount = betAmounts[contestantId];
-    if (!amount || amount <= 0) return;
+    if (amount === undefined || amount < 0) return; // Allow 0? Ideally min bet constraint.
 
     setActionLoading(`bet-${contestantId}`);
     try {
       await placeBet(sessionId, contestantId, amount);
-      setBetAmounts((prev) => ({ ...prev, [contestantId]: 0 }));
+      // Don't clear bet amounts, let them stay as is (reflecting current bet)
+      // setBetAmounts((prev) => ({ ...prev, [contestantId]: 0 })); 
+      // Actually, if we clear it, it falls back to myBets which will update via RTDB.
+      setBetAmounts((prev) => {
+        const newState = { ...prev };
+        delete newState[contestantId];
+        return newState;
+      });
     } catch (err) {
       console.error('Failed to place bet:', err);
     }
@@ -140,7 +156,10 @@ export function PlayerView() {
   };
 
   const setMaxBet = (contestantId: string) => {
-    setBetAmounts((prev) => ({ ...prev, [contestantId]: balance }));
+    const currentBet = myBets[contestantId] || 0;
+    // Max means: Current Locked in this bet + Current Available Balance
+    // New Total = CurrentBet + Balance
+    setBetAmounts((prev) => ({ ...prev, [contestantId]: currentBet + balance }));
   };
 
   if (sessionLoading || authLoading) {
@@ -265,8 +284,8 @@ export function PlayerView() {
                   return (
                     <div key={id} className="flex items-center">
                       <div className="text-center">
-                        <div className="w-16 h-16 rounded-full bg-surface-800 border-2 border-primary-500 flex items-center justify-center mx-auto mb-2 text-2xl font-bold text-primary-400">
-                          {v?.firstName?.charAt(0)}
+                        <div className="w-16 h-16 rounded-full bg-surface-800 border-2 border-primary-500 flex items-center justify-center mx-auto mb-2 text-sm font-bold text-primary-400">
+                          {formatNumber(bets[id] || 0)} 🍎
                         </div>
                         <p className="font-bold text-sm">{v?.firstName}</p>
                       </div>
@@ -388,7 +407,9 @@ export function PlayerView() {
           {status === 'BETTING' &&
             !isContestant &&
             !gameState?.bettingLocked &&
-            balance > 0 && (
+            !isContestant &&
+            !gameState?.bettingLocked &&
+            (balance > 0 || Object.keys(myBets).length > 0) && (
               <motion.div
                 className="space-y-4"
                 initial={{ opacity: 0 }}
@@ -410,8 +431,28 @@ export function PlayerView() {
                 {contestants.map((contestantId) => {
                   const contestantData = volunteers[contestantId];
                   const contestantOdds = odds[contestantId] || 1;
-                  const betAmount = betAmounts[contestantId] || 0;
-                  const potentialWin = Math.floor(betAmount * contestantOdds);
+                  
+                  const currentBet = myBets[contestantId] || 0;
+                  // If user is editing, show edit value. If not, show current locked bet.
+                  const inputVal = betAmounts[contestantId];
+                  const displayAmount = inputVal !== undefined ? inputVal : currentBet;
+                  
+                  const potentialWin = Math.floor(displayAmount * contestantOdds);
+                  const difference = displayAmount - currentBet;
+                  const isInsufficientBalance = difference > 0 && difference > balance;
+                  
+                  // Disable if:
+                  // 1. input undefined/empty (unless we have current bet? No, if undefined, we assume no change?)
+                  //    Actually displayAmount handles fallback.
+                  // 2. No change (diff == 0)
+                  // 3. Insufficient balance (diff > balance)
+                  // 4. Loading
+                  // 5. Amount < Min (1?)
+                  const canSubmit = 
+                    displayAmount >= 0 && 
+                    difference !== 0 && 
+                    !isInsufficientBalance &&
+                    actionLoading !== `bet-${contestantId}`;
 
                   return (
                     <motion.div
@@ -429,7 +470,7 @@ export function PlayerView() {
                             {contestantOdds.toFixed(2)}x {t('betting.odds')}
                           </div>
                         </div>
-                        {betAmount > 0 && (
+                        {displayAmount > 0 && (
                           <div className="text-right">
                             <p className="text-sm text-surface-400">
                               {t('betting.potentialWin')}
@@ -441,42 +482,47 @@ export function PlayerView() {
                         )}
                       </div>
 
-                      <div className="flex gap-3">
+                      <div className="flex gap-3 items-start">
                         <div className="relative flex-1">
                           <input
                             type="number"
-                            value={betAmount || ''}
+                            value={inputVal !== undefined ? inputVal : (currentBet || '')}
                             onChange={(e) =>
                               updateBetAmount(contestantId, e.target.value)
                             }
                             placeholder={t('betting.yourBet')}
-                            className="input-field pr-20"
-                            min="1"
-                            max={balance}
+                            className={`input-field pr-20 ${isInsufficientBalance ? 'border-red-500 focus:border-red-500' : ''}`}
+                            min="0"
                             dir="ltr"
                           />
                           <button
                             onClick={() => setMaxBet(contestantId)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-primary-400 hover:text-primary-300 font-medium"
+                            className="absolute right-3 top-3 text-xs text-primary-400 hover:text-primary-300 font-medium"
                           >
                             MAX
                           </button>
+                          {currentBet > 0 && (
+                             <div className="text-xs text-surface-500 mt-1 ml-1">
+                               Current Prediction: {formatNumber(currentBet)} 🍎
+                             </div>
+                          )}
+                          {isInsufficientBalance && (
+                            <div className="text-xs text-red-400 mt-1 ml-1">
+                              Insufficient balance (+{formatNumber(difference - balance)} needed)
+                            </div>
+                          )}
                         </div>
                         <motion.button
                           onClick={() => handlePlaceBet(contestantId)}
-                          disabled={
-                            !betAmount ||
-                            betAmount > balance ||
-                            actionLoading === `bet-${contestantId}`
-                          }
-                          className="btn-primary flex items-center gap-2"
-                          whileTap={{ scale: 0.95 }}
+                          disabled={!canSubmit}
+                          className={`btn-primary flex items-center gap-2 ${!canSubmit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          whileTap={canSubmit ? { scale: 0.95 } : {}}
                         >
                           {actionLoading === `bet-${contestantId}` ? (
                             <Loader2 className="w-5 h-5 animate-spin" />
                           ) : (
                             <>
-                              <span>{t('betting.placeBet')}</span>
+                              <span>{currentBet > 0 ? t('common.edit') : t('betting.placeBet')}</span>
                               <ArrowRight
                                 className={`w-5 h-5 ${isRTL ? 'rotate-180' : ''}`}
                               />
